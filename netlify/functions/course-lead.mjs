@@ -15,6 +15,53 @@ const FIELD_EMAIL = 'fldCawUjSTnaDDO9j'; // Email
 const FIELD_SOURCE = 'fldfCp8fztIeriZDZ'; // מקור הגעה
 const FIELD_PLATFORM = 'fld8h8I2b5TaaPEKA'; // Platform
 const FIELD_PRODUCTS = 'fldy6DhZezw4gVZuq'; // מוצרים (linked records)
+const FIELD_AD_NAME = 'fldGf8fiZdBxhvvzG'; // AD_Name
+const FIELD_ADSET_NAME = 'fldONC5BO7X7CxPsU'; // AD_G_Name
+const FIELD_CAMPAIGN = 'fldMFNgQMUKiYYsEH'; // Campaign_name
+
+// The payment page comes from the Tal Bashan admin engine, so every division
+// bills through one Cardcom terminal and every purchase is recorded in the
+// CRM automatically. The engine returns a branded /pay page for Maayan.
+// Needs ADMIN_INTERNAL_KEY (the engine's INTERNAL_API_KEY) in the Netlify env.
+const ADMIN_BASE_URL = process.env.ADMIN_BASE_URL || 'https://admin.talbashan.co.il';
+const COURSE_PRICE = Number(process.env.COURSE_PRICE || 1600);
+const COURSE_TITLE = process.env.COURSE_TITLE || 'קורס ניתוח גוף פתוח - מחזור אוקטובר 2026';
+// Used only if the engine is unreachable, so a buyer is never left without
+// a way to pay.
+const FALLBACK_PAYMENT_URL = 'https://secure.cardcom.solutions/EA/EA5/4SwsNP9VJ0ueOlqA9OOBzg/PaymentSP';
+
+async function brandedPaymentUrl({ name, phone, email, courseRecordId }) {
+  const key = process.env.ADMIN_INTERNAL_KEY;
+  if (!key) {
+    console.error('ADMIN_INTERNAL_KEY is not configured - falling back to the direct Cardcom link');
+    return FALLBACK_PAYMENT_URL;
+  }
+  try {
+    const response = await fetch(`${ADMIN_BASE_URL}/api/internal/payment-request`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-internal-key': key },
+      body: JSON.stringify({
+        tenant: 'maayan',
+        name,
+        phone,
+        email,
+        amount: COURSE_PRICE,
+        description: COURSE_TITLE,
+        productId: courseRecordId,
+        source: 'דף נחיתה - קורס שפת גוף',
+      }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || !data.url) {
+      console.error('payment-request failed', response.status, JSON.stringify(data));
+      return FALLBACK_PAYMENT_URL;
+    }
+    return data.url;
+  } catch (error) {
+    console.error('payment-request unreachable', error.message);
+    return FALLBACK_PAYMENT_URL;
+  }
+}
 
 // קורס שפת גוף אוקטובר 2026 — for the next cohort, override with the
 // COURSE_RECORD_ID environment variable instead of editing this file.
@@ -45,6 +92,14 @@ export default async (request) => {
     return Response.json({ ok: false, error: 'missing name or phone' }, { status: 400 });
   }
 
+  // Ad attribution, carried from the URL by the form. The CRM reads these
+  // four fields, so a lead can always be traced back to the ad that made it.
+  const utm = (key) => String(payload[key] ?? '').trim().slice(0, 250);
+  const utmSource = utm('utm_source');
+  const utmMedium = utm('utm_medium');
+  const utmContent = utm('utm_content');
+  const utmCampaign = utm('utm_campaign');
+
   const courseRecordId = process.env.COURSE_RECORD_ID || DEFAULT_COURSE_RECORD_ID;
 
   // Dedupe guard: if this phone number already submitted in the last 10
@@ -60,7 +115,10 @@ export default async (request) => {
     if (dedupeResponse.ok) {
       const dedupeData = await dedupeResponse.json();
       if (dedupeData.records?.length > 0) {
-        return Response.json({ ok: true, duplicate: true });
+        // Already registered a moment ago: no second lead, but still hand
+        // back a payment link so the buyer can continue.
+        const payUrl = await brandedPaymentUrl({ name, phone, email, courseRecordId });
+        return Response.json({ ok: true, duplicate: true, payUrl });
       }
     } else {
       console.error('Airtable dedupe check failed', dedupeResponse.status, await dedupeResponse.text());
@@ -86,8 +144,11 @@ export default async (request) => {
               [FIELD_PHONE]: phone,
               [FIELD_EMAIL]: email,
               [FIELD_SOURCE]: 'דף נחיתה - קורס שפת גוף',
-              [FIELD_PLATFORM]: 'Website',
+              [FIELD_PLATFORM]: utmSource || 'Website',
               [FIELD_PRODUCTS]: [courseRecordId],
+              ...(utmContent ? { [FIELD_AD_NAME]: utmContent } : {}),
+              ...(utmMedium ? { [FIELD_ADSET_NAME]: utmMedium } : {}),
+              ...(utmCampaign ? { [FIELD_CAMPAIGN]: utmCampaign } : {}),
             },
           },
         ],
@@ -102,7 +163,8 @@ export default async (request) => {
     return Response.json({ ok: false, error: 'airtable error' }, { status: 502 });
   }
 
-  return Response.json({ ok: true });
+  const payUrl = await brandedPaymentUrl({ name, phone, email, courseRecordId });
+  return Response.json({ ok: true, payUrl });
 };
 
 export const config = { path: '/api/course-lead' };

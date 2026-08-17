@@ -1,6 +1,7 @@
 ---
 import Footer from '../components/Footer.astro';
 import FloatingWhatsApp from '../components/FloatingWhatsApp.astro';
+import MetaPixel from '../components/MetaPixel.astro';
 import '../styles/global.css';
 
 const PAYMENT_URL = 'https://secure.cardcom.solutions/EA/EA5/4SwsNP9VJ0ueOlqA9OOBzg/PaymentSP';
@@ -123,6 +124,7 @@ const faqs = [
         startDate: '2026-10-23',
       },
     })} />
+    <MetaPixel />
   </head>
   <body>
     <nav class="lp-nav">
@@ -295,9 +297,9 @@ const faqs = [
         <div>
           <span class="lp-instant-tag">💳 מוכנים להצטרף?</span>
           <h3>אפשר להשלים את ההרשמה והתשלום כאן ועכשיו</h3>
-          <p>תשלום מאובטח בכרטיס אשראי. המקומות מוגבלים — כל עוד הכפתור כאן, יש מקום.</p>
+          <p>ממלאים פרטים וממשיכים ישר לתשלום מאובטח בכרטיס אשראי. המקומות מוגבלים — כל עוד הכפתור כאן, יש מקום.</p>
         </div>
-        <a href={PAYMENT_URL} target="_blank" rel="noopener" class="lp-btn lp-btn-light">לתשלום מאובטח — 1,600 ₪ ←</a>
+        <a href="#register" class="lp-btn lp-btn-light">להרשמה ותשלום — 1,600 ₪ ←</a>
       </div>
     </section>
 
@@ -369,12 +371,12 @@ const faqs = [
             <button type="submit">אני רוצה ללמוד שפת גוף! ←</button>
           </form>
           <div class="lp-form-success" hidden>
-            <p>נרשמת בהצלחה! נחזור אליך בהקדם 🎉</p>
-            <p class="lp-pay-now">רוצים להבטיח את המקום כבר עכשיו?</p>
-            <a href={PAYMENT_URL} target="_blank" rel="noopener" class="lp-btn">לתשלום מאובטח — 1,600 ₪ ←</a>
+            <p>הפרטים נקלטו. מעבירים אותך לתשלום מאובטח...</p>
+            <p class="lp-pay-now">הדף לא נפתח? אפשר להמשיך מכאן:</p>
+            <a href={PAYMENT_URL} rel="noopener" class="lp-btn">לתשלום מאובטח — 1,600 ₪ ←</a>
           </div>
           <p class="lp-form-error" hidden>אירעה תקלה בשליחה. נסו שוב או צרו קשר ישירות.</p>
-          <p class="lp-disclaimer">מחיר מיוחד 1,600 ₪ בלבד (במקום 3,000 ₪). נחזור אליכם בהקדם.</p>
+          <p class="lp-disclaimer">מחיר מיוחד 1,600 ₪ בלבד (במקום 3,000 ₪). ההרשמה מסתיימת בתשלום מאובטח.</p>
         </div>
       </div>
     </section>
@@ -411,6 +413,15 @@ const faqs = [
           body: encode,
         }).then((r) => r.ok);
 
+        // Ad attribution: whatever the ad put in the URL travels with the
+        // lead, so the CRM knows which campaign and which ad produced it.
+        const params = new URLSearchParams(window.location.search);
+        const utm = {};
+        ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term'].forEach((key) => {
+          const value = params.get(key);
+          if (value) utm[key] = value;
+        });
+
         const crm = fetch('/api/course-lead', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -418,14 +429,22 @@ const faqs = [
             name: formData.get('name'),
             email: formData.get('email'),
             phone: formData.get('phone'),
+            ...utm,
           }),
-        }).then((r) => r.ok).catch(() => false);
+        }).then(async (r) => (r.ok ? (await r.json().catch(() => ({}))) : false)).catch(() => false);
 
         Promise.allSettled([netlifyForms, crm]).then((results) => {
-          const anyOk = results.some((r) => r.status === 'fulfilled' && r.value === true);
+          const anyOk = results.some((r) => r.status === 'fulfilled' && r.value);
+          const crmResult = results[1].status === 'fulfilled' ? results[1].value : null;
           if (anyOk) {
+            if (window.fbq) window.fbq('track', 'Lead', { content_name: 'course-registration' });
             form.hidden = true;
             successMessage?.removeAttribute('hidden');
+            // Registration continues straight into the secure payment page.
+            // The link on the success block stays as a manual fallback.
+            if (crmResult && crmResult.payUrl) {
+              window.location.href = crmResult.payUrl;
+            }
           } else {
             errorMessage?.removeAttribute('hidden');
             isSubmitting = false;
