@@ -57,6 +57,35 @@ export function isValidIsraeliId(value) {
   return sum % 10 === 0;
 }
 
+/**
+ * Canonicalize an Israeli phone number for comparison.
+ *
+ * The stored data is not consistently formatted — the live table contains
+ * bare 10-digit numbers, hyphenated ones, `+972 …` international forms wrapped
+ * in Unicode bidi isolates, and at least one entry with a stray Hebrew letter
+ * in front. So everything is reduced to digits first and then folded to the
+ * local `0XXXXXXXXX` form, which makes all of those variants compare equal:
+ *
+ *   '0509482733'      -> '0509482733'
+ *   '050-9482733'     -> '0509482733'
+ *   '+972 50-948-2733'-> '0509482733'
+ *   '972509482733'    -> '0509482733'
+ *
+ * Returns '' when the value cannot be a phone number.
+ */
+export function normalizePhone(value) {
+  let digits = String(value ?? '').replace(/\D+/g, '');
+  if (!digits) return '';
+
+  if (digits.startsWith('00972')) digits = `0${digits.slice(5)}`;
+  else if (digits.startsWith('972')) digits = `0${digits.slice(3)}`;
+  else if (!digits.startsWith('0')) digits = `0${digits}`;
+
+  // Israeli numbers are 9 (landline) or 10 (mobile) digits in local form.
+  if (digits.length < 9 || digits.length > 10) return '';
+  return digits;
+}
+
 /** Format an ID for display on the certificate: always 9 digits. */
 export function formatIdForDisplay(value) {
   const id = normalizeId(value);

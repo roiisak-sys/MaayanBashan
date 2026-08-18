@@ -14,6 +14,7 @@ import {
   normalizeId,
   isValidIsraeliId,
   formatIdForDisplay,
+  normalizePhone,
   toVisualOrder,
 } from '../netlify/functions/lib/text.mjs';
 import { findEligibleParticipant, recordParticipantId, AirtableUnavailableError } from '../netlify/functions/lib/airtable.mjs';
@@ -25,6 +26,8 @@ const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const NAME_FIELD = 'fldtIhXNTeKPPs41O';
 const ID_FIELD = 'fldFPugfcZDT70yhP';
 const COURSE_FIELD = 'fldCourse';
+const PHONE_FIELD = 'fldPhone';
+const PHONE_FORMULA_FIELD = 'fldPhoneFormula';
 const TARGET_COURSE = 'recJuly2026';
 const OTHER_COURSE = 'recDec2025';
 
@@ -35,7 +38,9 @@ const BASE_ENV = {
   AIRTABLE_NAME_FIELD: NAME_FIELD,
   AIRTABLE_ID_FIELD: ID_FIELD,
   AIRTABLE_STATUS_FIELD: 'fldStatus',
-  AIRTABLE_COURSE_FIELD: 'fldCourse',
+  AIRTABLE_COURSE_FIELD: COURSE_FIELD,
+  AIRTABLE_PHONE_FIELD: PHONE_FIELD,
+  AIRTABLE_PHONE_FORMULA_FIELD: PHONE_FORMULA_FIELD,
   TARGET_COURSE_RECORD_ID: 'recJuly2026',
   PAID_STATUS: 'שילם',
 };
@@ -67,20 +72,25 @@ function fakeAirtable(paidRecords, { onWrite } = {}) {
   };
 }
 
-/** Helper: a paid record in the target cohort. */
-const inCohort = (fields) => ({ [COURSE_FIELD]: [TARGET_COURSE], ...fields });
+/** Helper: a paid record in the target cohort, with a phone by default. */
+const inCohort = (fields) => ({
+  [COURSE_FIELD]: [TARGET_COURSE],
+  [PHONE_FIELD]: '0509482733',
+  ...fields,
+});
 
-// Mirrors production today: names present, ID column blank.
+// Mirrors production today: names + phones present, ID column blank.
+// The phone formats deliberately mirror the messy real data.
 const COHORT = [
   inCohort({ [NAME_FIELD]: 'ישראל ישראלי' }),
-  inCohort({ [NAME_FIELD]: ' מור חסון' }),
-  inCohort({ [NAME_FIELD]: 'Yaffa Adler' }),
+  inCohort({ [NAME_FIELD]: ' מור חסון', [PHONE_FIELD]: '052-1112233' }),
+  inCohort({ [NAME_FIELD]: 'Yaffa Adler', [PHONE_FIELD]: '⁦+972 54-333-4455⁩' }),
 ];
 
 // A cohort where IDs have already been backfilled.
 const COHORT_WITH_IDS = [
   inCohort({ [NAME_FIELD]: 'ישראל ישראלי', [ID_FIELD]: '012345678' }),
-  inCohort({ [NAME_FIELD]: ' מור חסון', [ID_FIELD]: '311111118' }),
+  inCohort({ [NAME_FIELD]: ' מור חסון', [ID_FIELD]: '311111118', [PHONE_FIELD]: '052-1112233' }),
 ];
 
 describe('name normalization', () => {
@@ -128,6 +138,41 @@ describe('Israeli ID normalization', () => {
   });
 });
 
+describe('phone normalization', () => {
+  test('folds every format found in the live data to one canonical form', () => {
+    const expected = '0509482733';
+    for (const variant of [
+      '0509482733',           // 80 records
+      '050-9482733',          // 4 records
+      '050 948 2733',
+      '⁦+972 50-948-2733⁩',    // 5 records, bidi-isolated
+      '+972509482733',        // 1 record
+      '972509482733',         // Phone_Formula shape
+      '00972509482733',
+      'י 050-9482733',        // 1 record, stray Hebrew letter
+      ' 050-9482733 ',
+    ]) {
+      assert.equal(normalizePhone(variant), expected, `failed for ${JSON.stringify(variant)}`);
+    }
+  });
+
+  test('accepts 9-digit landline form', () => {
+    assert.equal(normalizePhone('03-1234567'), '031234567');
+  });
+
+  test('rejects values that cannot be a phone number', () => {
+    assert.equal(normalizePhone(''), '');
+    assert.equal(normalizePhone('abc'), '');
+    assert.equal(normalizePhone('12345'), '');
+    assert.equal(normalizePhone('05094827331234'), '');
+    assert.equal(normalizePhone(null), '');
+  });
+
+  test('does not conflate different numbers', () => {
+    assert.notEqual(normalizePhone('0509482733'), normalizePhone('0509482734'));
+  });
+});
+
 describe('RTL / bidi handling', () => {
   test('reverses pure Hebrew into visual order', () => {
     assert.equal(toVisualOrder('ישראל ישראלי'), 'ילארשי לארשי');
@@ -166,6 +211,7 @@ describe('eligibility verification', () => {
   test('succeeds by name for a paid July 2026 participant with no ID on file', async () => {
     const result = await findEligibleParticipant({
       name: 'ישראל ישראלי',
+      phone: '050-9482733',
       idNumber: '012345678',
       env: BASE_ENV,
       fetchImpl: fakeAirtable(COHORT),
@@ -182,6 +228,7 @@ describe('eligibility verification', () => {
     const writes = [];
     const participant = await findEligibleParticipant({
       name: 'ישראל ישראלי',
+      phone: '050-9482733',
       idNumber: '012345678',
       env: BASE_ENV,
       fetchImpl: fakeAirtable(COHORT),
@@ -201,6 +248,7 @@ describe('eligibility verification', () => {
     const writes = [];
     await recordParticipantId({
       recordId: 'recFake0',
+      phone: '050-9482733',
       idNumber: '012345678',
       env: BASE_ENV,
       fetchImpl: fakeAirtable(COHORT, { onWrite: (w) => writes.push(w) }),
@@ -212,6 +260,7 @@ describe('eligibility verification', () => {
   test('accepts the matching ID once one is on file, without rewriting', async () => {
     const result = await findEligibleParticipant({
       name: 'ישראל ישראלי',
+      phone: '050-9482733',
       idNumber: '012345678',
       env: BASE_ENV,
       fetchImpl: fakeAirtable(COHORT_WITH_IDS),
@@ -235,6 +284,7 @@ describe('eligibility verification', () => {
   test('never overwrites an existing ID', async () => {
     const result = await findEligibleParticipant({
       name: ' מור חסון',
+      phone: '052-1112233',
       idNumber: '311111118',
       env: BASE_ENV,
       fetchImpl: fakeAirtable(COHORT_WITH_IDS),
@@ -246,6 +296,7 @@ describe('eligibility verification', () => {
   test('write-back can be disabled', async () => {
     const result = await findEligibleParticipant({
       name: 'ישראל ישראלי',
+      phone: '050-9482733',
       idNumber: '012345678',
       env: { ...BASE_ENV, CERT_WRITE_ID: 'false' },
       fetchImpl: fakeAirtable(COHORT),
@@ -256,20 +307,59 @@ describe('eligibility verification', () => {
 
   test('strict mode still requires a stored ID to match', async () => {
     const strict = { ...BASE_ENV, CERT_REQUIRE_ID: 'true' };
+    const args = { name: 'ישראל ישראלי', phone: '050-9482733', idNumber: '012345678', env: strict };
     // Blank stored ID cannot satisfy strict verification.
-    assert.equal(
-      await findEligibleParticipant({ name: 'ישראל ישראלי', idNumber: '012345678', env: strict, fetchImpl: fakeAirtable(COHORT) }),
-      null
-    );
+    assert.equal(await findEligibleParticipant({ ...args, fetchImpl: fakeAirtable(COHORT) }), null);
     // Populated and matching does.
-    assert.ok(
-      await findEligibleParticipant({ name: 'ישראל ישראלי', idNumber: '012345678', env: strict, fetchImpl: fakeAirtable(COHORT_WITH_IDS) })
-    );
+    assert.ok(await findEligibleParticipant({ ...args, fetchImpl: fakeAirtable(COHORT_WITH_IDS) }));
+  });
+
+  test('rejects the right name with the WRONG phone', async () => {
+    // The whole point of the second factor: a guessable first name is no
+    // longer sufficient on its own.
+    const result = await findEligibleParticipant({
+      name: 'ישראל ישראלי',
+      phone: '050-0000000',
+      idNumber: '012345678',
+      env: BASE_ENV,
+      fetchImpl: fakeAirtable(COHORT),
+    });
+    assert.equal(result, null);
+  });
+
+  test('rejects a missing phone', async () => {
+    const result = await findEligibleParticipant({
+      name: 'ישראל ישראלי',
+      phone: '',
+      idNumber: '012345678',
+      env: BASE_ENV,
+      fetchImpl: fakeAirtable(COHORT),
+    });
+    assert.equal(result, null);
+  });
+
+  test('matches when only the formula column holds a usable phone', async () => {
+    const result = await findEligibleParticipant({
+      name: 'ישראל ישראלי',
+      phone: '050-9482733',
+      idNumber: '012345678',
+      env: BASE_ENV,
+      fetchImpl: fakeAirtable([
+        {
+          [NAME_FIELD]: 'ישראל ישראלי',
+          [COURSE_FIELD]: [TARGET_COURSE],
+          [PHONE_FIELD]: '',
+          [PHONE_FORMULA_FIELD]: '972509482733',
+        },
+      ]),
+    });
+    assert.ok(result, 'either phone column may carry the usable value');
   });
 
   test('rejects a wrong name', async () => {
     const result = await findEligibleParticipant({
       name: 'מישהו אחר',
+      phone: '050-9482733',
       idNumber: '012345678',
       env: BASE_ENV,
       fetchImpl: fakeAirtable(COHORT),
@@ -281,6 +371,7 @@ describe('eligibility verification', () => {
     // Unpaid records are excluded by filterByFormula, so they never appear.
     const result = await findEligibleParticipant({
       name: 'נרשמת שלא שילמה',
+      phone: '050-9482733',
       idNumber: '012345678',
       env: BASE_ENV,
       fetchImpl: fakeAirtable(COHORT),
@@ -294,6 +385,7 @@ describe('eligibility verification', () => {
     // version filtered on the formula alone and matched nobody at all.
     const result = await findEligibleParticipant({
       name: 'בוגרת קורס אחר',
+      phone: '050-9482733',
       idNumber: '012345678',
       env: BASE_ENV,
       fetchImpl: fakeAirtable([
@@ -307,10 +399,11 @@ describe('eligibility verification', () => {
   test('REGRESSION: matches a participant linked to several courses', async () => {
     const result = await findEligibleParticipant({
       name: 'בוגרת שני קורסים',
+      phone: '050-9482733',
       idNumber: '012345678',
       env: BASE_ENV,
       fetchImpl: fakeAirtable([
-        { [NAME_FIELD]: 'בוגרת שני קורסים', [COURSE_FIELD]: [OTHER_COURSE, TARGET_COURSE] },
+        { [NAME_FIELD]: 'בוגרת שני קורסים', [PHONE_FIELD]: '0509482733', [COURSE_FIELD]: [OTHER_COURSE, TARGET_COURSE] },
       ]),
     });
     assert.ok(result, 'membership of the target cohort is what matters');
@@ -319,6 +412,7 @@ describe('eligibility verification', () => {
   test('REGRESSION: a record with no course link is never eligible', async () => {
     const result = await findEligibleParticipant({
       name: 'ליד ללא קורס',
+      phone: '050-9482733',
       idNumber: '012345678',
       env: BASE_ENV,
       fetchImpl: fakeAirtable([{ [NAME_FIELD]: 'ליד ללא קורס' }]),
@@ -332,6 +426,7 @@ describe('eligibility verification', () => {
     let captured;
     await findEligibleParticipant({
       name: 'ישראל ישראלי',
+      phone: '050-9482733',
       idNumber: '012345678',
       env: BASE_ENV,
       fetchImpl: async (url) => {
@@ -354,6 +449,7 @@ describe('eligibility verification', () => {
   test('tolerates stored names with stray whitespace', async () => {
     const result = await findEligibleParticipant({
       name: 'מור חסון',
+      phone: '052-1112233',
       idNumber: '311111118',
       env: BASE_ENV,
       fetchImpl: fakeAirtable(COHORT),
@@ -365,6 +461,8 @@ describe('eligibility verification', () => {
   test('matches Latin names case-insensitively', async () => {
     const result = await findEligibleParticipant({
       name: 'yaffa adler',
+      // Stored as an international number wrapped in bidi isolates.
+      phone: '054-3334455',
       idNumber: '987654321',
       env: BASE_ENV,
       fetchImpl: fakeAirtable(COHORT),
@@ -375,6 +473,7 @@ describe('eligibility verification', () => {
   test('refuses ambiguous duplicate names rather than guessing', async () => {
     const result = await findEligibleParticipant({
       name: 'ישראל ישראלי',
+      phone: '050-9482733',
       idNumber: '012345678',
       env: BASE_ENV,
       fetchImpl: fakeAirtable([

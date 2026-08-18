@@ -46,6 +46,22 @@ import '../styles/global.css';
           </div>
 
           <div class="cert-field">
+            <label for="phone">טלפון נייד</label>
+            <input
+              type="tel"
+              id="phone"
+              name="phone"
+              placeholder="050-9482733"
+              inputmode="tel"
+              autocomplete="tel"
+              enterkeyhint="next"
+              maxlength="30"
+              dir="ltr"
+              required
+            />
+          </div>
+
+          <div class="cert-field">
             <label for="idNumber">מספר תעודת זהות</label>
             <input
               type="text"
@@ -56,6 +72,7 @@ import '../styles/global.css';
               autocomplete="off"
               enterkeyhint="go"
               maxlength="20"
+              dir="ltr"
               required
             />
           </div>
@@ -86,10 +103,12 @@ import '../styles/global.css';
         var downloadEl = document.getElementById('cert-download');
         var resetEl = document.getElementById('cert-reset');
         var nameEl = document.getElementById('name');
+        var phoneEl = document.getElementById('phone');
         var idEl = document.getElementById('idNumber');
 
         var MESSAGES = {
           EMPTY: 'נא למלא את כל השדות.',
+          INVALID_PHONE_FORMAT: 'מספר הטלפון שהוזן אינו תקין. אנא הזינו מספר בפורמט 050-9482733.',
           INVALID_ID_FORMAT: 'מספר תעודת הזהות שהוזן אינו תקין. אנא בדקו ונסו שוב.',
           INVALID_DETAILS: 'לא הצלחנו לאמת את הפרטים שהוזנו. אנא בדקו את הפרטים ונסו שוב.',
           RATE_LIMITED: 'בוצעו יותר מדי ניסיונות. אנא נסו שוב בעוד מספר דקות.',
@@ -131,11 +150,12 @@ import '../styles/global.css';
           clearError();
 
           var name = nameEl.value.trim();
+          var phone = phoneEl.value.trim();
           var idNumber = idEl.value.trim();
 
-          if (!name || !idNumber) {
+          if (!name || !phone || !idNumber) {
             showError(MESSAGES.EMPTY);
-            (!name ? nameEl : idEl).focus();
+            (!name ? nameEl : (!phone ? phoneEl : idEl)).focus();
             return;
           }
 
@@ -144,7 +164,7 @@ import '../styles/global.css';
           fetch('/api/certificate', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name: name, idNumber: idNumber })
+            body: JSON.stringify({ name: name, phone: phone, idNumber: idNumber })
           })
             .then(function (response) {
               var type = response.headers.get('Content-Type') || '';
@@ -185,6 +205,7 @@ import '../styles/global.css';
           form.hidden = false;
           setBusy(false);
           clearError();
+          phoneEl.value = '';
           idEl.value = '';
           nameEl.focus();
         });

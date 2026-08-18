@@ -4,7 +4,7 @@
 // beyond a boolean decision plus the canonical name to print on the
 // certificate.
 
-import { normalizeName, normalizeId } from './text.mjs';
+import { normalizeName, normalizeId, normalizePhone } from './text.mjs';
 
 /** Thrown when Airtable itself is unreachable/misconfigured, as opposed to a
  *  simple "no match" result. Lets the caller distinguish 503 from 401. */
@@ -27,6 +27,11 @@ export function getAirtableConfig(env = process.env) {
     idField: env.AIRTABLE_ID_FIELD || 'fldFPugfcZDT70yhP',
     statusField: env.AIRTABLE_STATUS_FIELD || 'fld9Smx5O2HTn4zus',
     courseField: env.AIRTABLE_COURSE_FIELD || 'fldy6DhZezw4gVZuq',
+
+    // Two phone columns exist and neither is dependably formatted, so both are
+    // read and a match against either is accepted.
+    phoneField: env.AIRTABLE_PHONE_FIELD || 'fldIaXr31RLDOZgUh',
+    phoneFormulaField: env.AIRTABLE_PHONE_FORMULA_FIELD || 'flddifziqcl15DjxE',
 
     // Formulas can only reference fields by name, so this one is the display
     // name rather than the ID. Must be updated if the column is renamed.
@@ -62,7 +67,7 @@ export function getAirtableConfig(env = process.env) {
  *
  * Only the fields required for matching are requested from Airtable.
  */
-export async function findEligibleParticipant({ name, idNumber, env = process.env, fetchImpl = fetch }) {
+export async function findEligibleParticipant({ name, phone, idNumber, env = process.env, fetchImpl = fetch }) {
   const config = getAirtableConfig(env);
 
   // filterByFormula can only reference fields by NAME (field IDs are not valid
@@ -80,6 +85,8 @@ export async function findEligibleParticipant({ name, idNumber, env = process.en
   params.append('fields[]', config.nameField);
   params.append('fields[]', config.idField);
   params.append('fields[]', config.courseField);
+  params.append('fields[]', config.phoneField);
+  params.append('fields[]', config.phoneFormulaField);
 
   const records = [];
   let offset;
@@ -107,8 +114,9 @@ export async function findEligibleParticipant({ name, idNumber, env = process.en
   } while (offset);
 
   const wantedName = normalizeName(name);
+  const wantedPhone = normalizePhone(phone);
   const wantedId = normalizeId(idNumber);
-  if (!wantedName || !wantedId) return null;
+  if (!wantedName || !wantedPhone || !wantedId) return null;
 
   // Cohort membership is checked here rather than in the formula: a
   // linked-record field cannot be matched on record ID from within a formula
@@ -119,11 +127,22 @@ export async function findEligibleParticipant({ name, idNumber, env = process.en
     return Array.isArray(links) && links.includes(config.targetCourseRecordId);
   });
 
-  // Identity is established by name against the eligible cohort. The ID is
-  // then reconciled against whatever is on file.
-  const matches = cohort.filter(
-    (record) => normalizeName(record.fields?.[config.nameField]) === wantedName
-  );
+  // Identity requires BOTH the name and the phone number to match. Name alone
+  // is too weak here: several participants are recorded under a single first
+  // name, which anyone could guess. The ID is then reconciled separately.
+  const matches = cohort.filter((record) => {
+    const fields = record.fields ?? {};
+    if (normalizeName(fields[config.nameField]) !== wantedName) return false;
+
+    // Either phone column may be the well-formed one, so a match on either is
+    // accepted; both are canonicalized before comparison.
+    const candidates = [
+      normalizePhone(fields[config.phoneField]),
+      normalizePhone(fields[config.phoneFormulaField]),
+    ].filter(Boolean);
+
+    return candidates.includes(wantedPhone);
+  });
 
   // Ambiguity is treated as failure: if two eligible participants share a
   // normalized name we must not guess whose certificate to issue.

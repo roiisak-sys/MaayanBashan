@@ -16,38 +16,67 @@ from the original designed template.
 ## Verification model
 
 The `ID` column in Airtable started out empty for all 92 paid July 2026
-participants, so the ID cannot be used as a pre-existing secret. The system
-therefore works in both directions:
+participants, so the ID cannot be used as a pre-existing secret. Verification
+therefore rests on **name + mobile phone**, both of which are already on record:
 
-1. **Identity is established by name** against the paid July 2026 cohort.
-2. **The submitted ID is printed on the certificate.**
+1. **Identity requires the name AND the phone number to match** the same record
+   in the paid July 2026 cohort.
+2. **The submitted ID is printed on the certificate** — it is never used to
+   grant access on its own.
 3. **If the record has no ID stored, the submitted ID is written back**, so the
    CRM fills itself in as graduates collect their certificates.
 4. **Once an ID is on file it becomes authoritative.** A later request for the
-   same name with a *different* ID is refused — "trust on first use".
+   same person with a *different* ID is refused — "trust on first use".
 
 An existing ID is never overwritten.
 
-### Security trade-off — read before launch
+The phone number is used **only** for verification: it is never printed on the
+certificate, never returned to the browser, and never written to logs.
 
-Because only the name is verified, **anyone who knows a participant's name can
-download that participant's certificate** until that participant has claimed
-theirs. Several names in this cohort are single first names (`חגית`, `רוזנה`,
-`אורה`, `לבנת`, `הנאדי`), which are guessable.
+### Why the phone is required
 
-Consequences worth understanding:
+Name alone was too weak. Several participants are recorded under a single first
+name (`חגית`, `רוזנה`, `אורה`, `לבנת`, `הנאדי`) which anyone could guess, and
+the certificate would have been issued to whoever asked first. Requiring the
+phone number that Maayan already has on file closes that gap without asking
+graduates for anything they do not know.
 
-- A wrong ID submitted first sticks, and would then lock the real participant
-  out (they would be refused for having the "wrong" ID). If that happens, clear
-  that record's `ID` field in Airtable and they can re-claim.
-- Certificates are low-value and the link is distributed privately by WhatsApp,
-  which is why this was judged acceptable. It is a deliberate trade-off, not an
-  oversight.
+All 92 participants in the cohort have a phone on record, so no one is excluded.
 
-To tighten this later, once the column is populated set `CERT_REQUIRE_ID=true`
-and verification becomes strict name + ID.
-To disable Airtable writes entirely, set `CERT_WRITE_ID=false` — certificates
-are still issued, the ID is just not recorded.
+### Phone normalization
+
+The stored formats are inconsistent, so both sides are reduced to digits and
+folded to the local `0XXXXXXXXX` form before comparison. Real shapes present in
+the data, all of which now compare equal:
+
+| Stored value | Canonical |
+|---|---|
+| `0509482733` | `0509482733` |
+| `050-9482733` | `0509482733` |
+| `⁦+972 50-948-2733⁩` (bidi-isolated) | `0509482733` |
+| `+972509482733` | `0509482733` |
+| `972509482733` (`Phone_Formula`) | `0509482733` |
+| `י 050-9482733` (stray Hebrew letter) | `0509482733` |
+
+Two phone columns exist (`Phone` and `Phone_Formula`) and neither is dependably
+clean, so both are read and a match against **either** is accepted.
+
+Users may type any of these forms; the placeholder suggests `050-9482733`.
+
+### Remaining trade-off
+
+Someone who knows both a graduate's name and their mobile number could still
+claim that graduate's certificate. That is a much higher bar than a guessable
+first name, and these are low-value certificates on a privately-distributed
+link, so it was judged acceptable.
+
+If a wrong ID is claimed first it becomes authoritative and would refuse the
+real participant. Clear that record's `ID` field in Airtable and they can
+re-claim.
+
+Once the ID column is populated, `CERT_REQUIRE_ID=true` makes verification
+strict name + phone + ID. `CERT_WRITE_ID=false` disables Airtable writes
+entirely.
 
 Israeli ID check digits are validated before anything is written or printed, so
 typos cannot poison the CRM or land on a certificate.
@@ -79,6 +108,7 @@ A certificate is issued only when **all** of the following hold:
 | Condition | Source |
 |---|---|
 | Name matches (normalized) | `שם` field |
+| Phone matches (canonicalized) | `Phone` or `Phone_Formula` |
 | Course = July 2026 | linked record `recKv98sOFZmx3cOT` in `מוצרים` |
 | Status = paid | `סטטוס` = `שילם` |
 | ID is valid, and matches any ID already stored | `ID` field |
@@ -104,6 +134,9 @@ Copy `.env.example` to `.env` for local work; set the same values in
 | `AIRTABLE_NAME_FIELD` | Field ID of the name column |
 | `AIRTABLE_ID_FIELD` | Field ID of the ID column |
 | `AIRTABLE_STATUS_FIELD` | Field ID of the status column |
+| `AIRTABLE_PHONE_FIELD` | Field ID of the `Phone` column |
+| `AIRTABLE_PHONE_FORMULA_FIELD` | Field ID of the `Phone_Formula` column |
+| `AIRTABLE_STATUS_FIELD_NAME` | Status column **name** (formulas cannot use IDs) |
 | `AIRTABLE_COURSE_FIELD` | Field ID of the linked-course column |
 | `TARGET_COURSE_RECORD_ID` | Record ID of the target cohort |
 | `PAID_STATUS` | Status value meaning paid (`שילם`) |

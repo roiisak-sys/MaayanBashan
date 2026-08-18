@@ -16,7 +16,7 @@ import { fileURLToPath } from 'node:url';
 import { findEligibleParticipant, recordParticipantId, AirtableUnavailableError } from './lib/airtable.mjs';
 import { generateCertificate, buildFilename } from './lib/certificate.mjs';
 import { checkRateLimit, getClientIp } from './lib/rate-limit.mjs';
-import { isValidIsraeliId } from './lib/text.mjs';
+import { isValidIsraeliId, normalizePhone } from './lib/text.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 
@@ -100,12 +100,24 @@ export default async (request, context) => {
   }
 
   const name = typeof payload?.name === 'string' ? payload.name : '';
+  const phone = typeof payload?.phone === 'string' ? payload.phone : '';
   const idNumber = typeof payload?.idNumber === 'string' ? payload.idNumber : '';
 
   // Bound the input before it reaches any downstream processing.
-  if (!name.trim() || !idNumber.trim() || name.length > 120 || idNumber.length > 40) {
+  if (
+    !name.trim() || !phone.trim() || !idNumber.trim() ||
+    name.length > 120 || phone.length > 30 || idNumber.length > 40
+  ) {
     log({ success: false, reason: 'invalid_input', requestId, ms: Date.now() - startedAt });
     return jsonError('INVALID_DETAILS', 401);
+  }
+
+  // Reject an unparseable phone up front. Like the ID check below, this is a
+  // format complaint about the user's own input and reveals nothing about who
+  // is enrolled, so a specific message is safe.
+  if (!normalizePhone(phone)) {
+    log({ success: false, reason: 'invalid_phone_format', requestId, ms: Date.now() - startedAt });
+    return jsonError('INVALID_PHONE_FORMAT', 400);
   }
 
   // Reject malformed IDs before touching Airtable. Every real Israeli ID has a
@@ -119,7 +131,7 @@ export default async (request, context) => {
 
   let participant;
   try {
-    participant = await findEligibleParticipant({ name, idNumber, env });
+    participant = await findEligibleParticipant({ name, phone, idNumber, env });
   } catch (error) {
     if (error instanceof AirtableUnavailableError) {
       // Technical detail stays server-side.
