@@ -34,7 +34,7 @@ const SUPPORT_WA_HREF = `https://wa.me/972509841722?text=${encodeURIComponent(SU
         </header>
 
         <h1>תעודת הסיום שלך</h1>
-        <p class="cert-sub">הזיני את הפרטים שלך כדי לאמת את הזכאות ולהפיק את תעודת הסיום.</p>
+        <p class="cert-sub">הזינו את הפרטים כדי לאמת את הזכאות ולהפיק את תעודת הסיום.</p>
 
         <form id="cert-form" novalidate>
           <div class="cert-field">
@@ -43,7 +43,7 @@ const SUPPORT_WA_HREF = `https://wa.me/972509841722?text=${encodeURIComponent(SU
               type="text"
               id="name"
               name="name"
-              placeholder="שם מלא כפי שנרשם לקורס"
+              placeholder="שם מלא כפי שנמסר בהרשמה לקורס"
               autocomplete="name"
               enterkeyhint="next"
               maxlength="120"
@@ -185,7 +185,7 @@ const SUPPORT_WA_HREF = `https://wa.me/972509841722?text=${encodeURIComponent(SU
             return;
           }
 
-          setBusy(true, 'בודקת את הפרטים...');
+          setBusy(true, 'בודקים את הפרטים...');
 
           fetch('/api/certificate', {
             method: 'POST',
@@ -196,7 +196,7 @@ const SUPPORT_WA_HREF = `https://wa.me/972509841722?text=${encodeURIComponent(SU
               var type = response.headers.get('Content-Type') || '';
 
               if (response.ok && type.indexOf('application/pdf') !== -1) {
-                setBusy(true, 'מעבדת את התעודה...');
+                setBusy(true, 'מפיקים את התעודה...');
                 var disposition = response.headers.get('Content-Disposition') || '';
                 var match = disposition.match(/filename="([^"]+)"/);
                 var filename = match ? match[1] : 'certificate.pdf';
