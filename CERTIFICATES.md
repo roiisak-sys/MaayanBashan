@@ -88,7 +88,7 @@ Copy `.env.example` to `.env` for local work; set the same values in
 | `TARGET_COURSE_RECORD_ID` | Record ID of the target cohort |
 | `PAID_STATUS` | Status value meaning paid (`שילם`) |
 | `CERT_REQUIRE_ID` | `true` (default) requires the ID to match |
-| `CERT_RATE_LIMIT` | Requests per window per IP (default 10) |
+| `CERT_RATE_LIMIT` | Requests per window per client (default 20) |
 | `CERT_RATE_WINDOW_MS` | Window length in ms (default 600000) |
 | `CERT_NAME_*` / `CERT_ID_*` | Optional PDF coordinate overrides |
 
@@ -235,12 +235,23 @@ The system deploys with the site — no separate service.
 - Download filenames are ASCII-only and cannot inject headers; the ID never
   appears in a filename.
 
-### Known limitation: rate limiting
+### Rate limiting
 
-Rate limiting is in-memory and therefore **per serverless instance**. An attacker
-spreading requests across cold starts gets a higher effective limit than the
-configured one. This was a deliberate trade-off: adding a shared store (Redis /
-Upstash) for a page used by ~90 people is more infrastructure than the problem
-warrants, and the in-memory limiter still removes practical brute-forcing from a
-single client. If stronger guarantees are needed, replace
+Callers are identified by `context.ip` (Netlify Functions v2), falling back to
+`x-nf-client-connection-ip` / `x-forwarded-for` / `client-ip`, and finally to a
+coarse fingerprint of user-agent + accept-language.
+
+That last fallback matters: an earlier version returned the constant `'unknown'`
+when no IP was available, which put every visitor in one bucket and let a single
+client lock out the entire site. The fingerprint is weaker than an IP (different
+users can collide) but it fails towards limiting an individual rather than
+everyone. Each response logs `ipSource=` so a host that silently degrades to
+fingerprinting is visible without logging any identity.
+
+**Known limitation:** the limiter is in-memory and therefore **per serverless
+instance**. An attacker spreading requests across cold starts gets a higher
+effective limit than configured. This was a deliberate trade-off: adding a shared
+store (Redis / Upstash) for a page used by ~90 people is more infrastructure than
+the problem warrants, and the in-memory limiter still removes practical
+brute-forcing from a single client. If stronger guarantees are needed, replace
 `netlify/functions/lib/rate-limit.mjs` — the interface is a single function.
