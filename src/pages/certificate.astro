@@ -1,0 +1,408 @@
+---
+import '../styles/global.css';
+---
+<!doctype html>
+<html lang="he" dir="rtl">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>תעודת הסיום שלך | מעיין בשן</title>
+    <!-- Private utility page: must never be indexed. -->
+    <meta name="robots" content="noindex, nofollow" />
+    <meta name="referrer" content="no-referrer" />
+    <meta name="theme-color" content="#0b1024" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  </head>
+  <body>
+    <main class="cert-page">
+      <div class="cert-glow" aria-hidden="true"></div>
+
+      <div class="cert-card">
+        <header class="cert-header">
+          <img src="/images/logo-white.png" alt="מעיין בשן" class="cert-logo" width="150" height="40" />
+        </header>
+
+        <h1>תעודת הסיום שלך</h1>
+        <p class="cert-sub">הזיני את הפרטים שלך כדי לאמת את הזכאות ולהפיק את תעודת הסיום.</p>
+
+        <form id="cert-form" novalidate>
+          <div class="cert-field">
+            <label for="name">שם מלא</label>
+            <input
+              type="text"
+              id="name"
+              name="name"
+              placeholder="שם מלא כפי שנרשם לקורס"
+              autocomplete="name"
+              enterkeyhint="next"
+              maxlength="120"
+              required
+            />
+          </div>
+
+          <div class="cert-field">
+            <label for="idNumber">מספר תעודת זהות</label>
+            <input
+              type="text"
+              id="idNumber"
+              name="idNumber"
+              placeholder="מספר תעודת זהות"
+              inputmode="numeric"
+              autocomplete="off"
+              enterkeyhint="go"
+              maxlength="20"
+              required
+            />
+          </div>
+
+          <button type="submit" id="cert-submit">הפקת התעודה</button>
+        </form>
+
+        <p class="cert-status" id="cert-error" role="alert" aria-live="assertive" hidden></p>
+
+        <div class="cert-success" id="cert-success" role="status" aria-live="polite" hidden>
+          <div class="cert-success-icon" aria-hidden="true">🎓</div>
+          <h2>התעודה שלך מוכנה</h2>
+          <p>התעודה הופקה בהצלחה.</p>
+          <a class="cert-download" id="cert-download" href="#" download>הורדת תעודת הסיום</a>
+          <button type="button" class="cert-reset" id="cert-reset">הפקת תעודה נוספת</button>
+        </div>
+
+        <p class="cert-privacy">הפרטים משמשים לאימות זכאות בלבד ואינם נשמרים.</p>
+      </div>
+    </main>
+
+    <script is:inline>
+      (function () {
+        var form = document.getElementById('cert-form');
+        var submit = document.getElementById('cert-submit');
+        var errorEl = document.getElementById('cert-error');
+        var successEl = document.getElementById('cert-success');
+        var downloadEl = document.getElementById('cert-download');
+        var resetEl = document.getElementById('cert-reset');
+        var nameEl = document.getElementById('name');
+        var idEl = document.getElementById('idNumber');
+
+        var MESSAGES = {
+          EMPTY: 'נא למלא את כל השדות.',
+          INVALID_DETAILS: 'לא הצלחנו לאמת את הפרטים שהוזנו. אנא בדקו את הפרטים ונסו שוב.',
+          RATE_LIMITED: 'בוצעו יותר מדי ניסיונות. אנא נסו שוב בעוד מספר דקות.',
+          SERVICE_UNAVAILABLE: 'לא ניתן היה להשלים את הבדיקה כרגע. אנא נסו שוב מאוחר יותר.',
+          PDF_FAILED: 'מצאנו את הפרטים שלך, אך אירעה תקלה בהפקת התעודה. אנא נסו שוב.',
+          NETWORK: 'לא ניתן היה להשלים את הבדיקה כרגע. אנא נסו שוב מאוחר יותר.'
+        };
+
+        var busy = false;
+        var objectUrl = null;
+
+        function showError(message) {
+          errorEl.textContent = message;
+          errorEl.hidden = false;
+        }
+
+        function clearError() {
+          errorEl.hidden = true;
+          errorEl.textContent = '';
+        }
+
+        function setBusy(state, label) {
+          busy = state;
+          submit.disabled = state;
+          submit.classList.toggle('is-busy', state);
+          submit.textContent = state ? label : 'הפקת התעודה';
+        }
+
+        function revokeUrl() {
+          if (objectUrl) {
+            URL.revokeObjectURL(objectUrl);
+            objectUrl = null;
+          }
+        }
+
+        form.addEventListener('submit', function (event) {
+          event.preventDefault();
+          if (busy) return;
+          clearError();
+
+          var name = nameEl.value.trim();
+          var idNumber = idEl.value.trim();
+
+          if (!name || !idNumber) {
+            showError(MESSAGES.EMPTY);
+            (!name ? nameEl : idEl).focus();
+            return;
+          }
+
+          setBusy(true, 'בודקת את הפרטים...');
+
+          fetch('/api/certificate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: name, idNumber: idNumber })
+          })
+            .then(function (response) {
+              var type = response.headers.get('Content-Type') || '';
+
+              if (response.ok && type.indexOf('application/pdf') !== -1) {
+                setBusy(true, 'מעבדת את התעודה...');
+                var disposition = response.headers.get('Content-Disposition') || '';
+                var match = disposition.match(/filename="([^"]+)"/);
+                var filename = match ? match[1] : 'certificate.pdf';
+                return response.blob().then(function (blob) {
+                  revokeUrl();
+                  objectUrl = URL.createObjectURL(blob);
+                  downloadEl.href = objectUrl;
+                  downloadEl.setAttribute('download', filename);
+                  form.hidden = true;
+                  successEl.hidden = false;
+                  downloadEl.focus();
+                });
+              }
+
+              return response
+                .json()
+                .catch(function () { return {}; })
+                .then(function (data) {
+                  showError(MESSAGES[data.error] || MESSAGES.INVALID_DETAILS);
+                  setBusy(false);
+                });
+            })
+            .catch(function () {
+              showError(MESSAGES.NETWORK);
+              setBusy(false);
+            });
+        });
+
+        resetEl.addEventListener('click', function () {
+          revokeUrl();
+          successEl.hidden = true;
+          form.hidden = false;
+          setBusy(false);
+          clearError();
+          idEl.value = '';
+          nameEl.focus();
+        });
+      })();
+    </script>
+  </body>
+</html>
+
+<style>
+  :root {
+    --c-bg: #0b1024;
+    --c-card: #17204a;
+    --c-ink: #f3efe3;
+    --c-ink-dim: rgba(243, 239, 227, 0.72);
+    --c-gold: #c9a05c;
+    --c-gold-soft: #e6cd94;
+    --c-rose: #e8a1b1;
+    --c-border: rgba(201, 160, 92, 0.28);
+    --c-font: 'Assistant', system-ui, sans-serif;
+  }
+
+  body {
+    margin: 0;
+    background: var(--c-bg);
+    color: var(--c-ink);
+    font-family: var(--c-font);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .cert-page {
+    position: relative;
+    min-height: 100svh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem 1.25rem;
+    overflow: hidden;
+  }
+
+  .cert-glow {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background:
+      radial-gradient(ellipse 700px 480px at 50% -5%, rgba(201, 160, 92, 0.18), transparent 70%),
+      radial-gradient(ellipse 600px 400px at 10% 105%, rgba(232, 161, 177, 0.09), transparent 65%);
+  }
+
+  .cert-card {
+    position: relative;
+    width: 100%;
+    max-width: 460px;
+    background: var(--c-card);
+    border: 1px solid var(--c-border);
+    border-radius: 20px;
+    padding: 2.5rem 2rem;
+    box-shadow: 0 22px 55px rgba(0, 0, 0, 0.5);
+    text-align: center;
+  }
+
+  .cert-header { margin-bottom: 1.75rem; }
+  .cert-logo { height: 34px; width: auto; margin: 0 auto; display: block; }
+
+  .cert-card h1 {
+    font-size: clamp(1.6rem, 5.5vw, 2rem);
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    margin: 0 0 0.6rem;
+    color: var(--c-ink);
+  }
+
+  .cert-sub {
+    margin: 0 0 2rem;
+    font-size: 1rem;
+    line-height: 1.7;
+    color: var(--c-ink-dim);
+  }
+
+  form { display: grid; gap: 1.1rem; text-align: start; }
+
+  .cert-field { display: grid; gap: 0.4rem; }
+
+  .cert-field label {
+    font-size: 0.92rem;
+    font-weight: 600;
+    color: var(--c-gold-soft);
+  }
+
+  .cert-field input {
+    width: 100%;
+    box-sizing: border-box;
+    /* 16px minimum prevents iOS Safari from zooming on focus. */
+    font-size: 16px;
+    font-family: inherit;
+    color: var(--c-ink);
+    background: rgba(255, 255, 255, 0.06);
+    border: 1.5px solid rgba(243, 239, 227, 0.2);
+    border-radius: 12px;
+    /* Comfortable touch target on phones. */
+    padding: 0.85rem 0.9rem;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  }
+
+  .cert-field input::placeholder { color: rgba(243, 239, 227, 0.38); }
+
+  .cert-field input:focus-visible {
+    outline: none;
+    border-color: var(--c-gold);
+    box-shadow: 0 0 0 3px rgba(201, 160, 92, 0.25);
+  }
+
+  button[type='submit'] {
+    margin-top: 0.4rem;
+    width: 100%;
+    min-height: 52px;
+    font-family: inherit;
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #0b1024;
+    background: linear-gradient(135deg, var(--c-gold-soft), var(--c-gold) 62%, #8a6423);
+    border: none;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
+  }
+
+  button[type='submit']:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 28px rgba(201, 160, 92, 0.35);
+  }
+
+  button[type='submit']:focus-visible {
+    outline: 3px solid var(--c-gold-soft);
+    outline-offset: 3px;
+  }
+
+  button[type='submit']:disabled { cursor: default; opacity: 0.75; }
+
+  .is-busy { position: relative; padding-inline-start: 2.4rem; }
+  .is-busy::before {
+    content: '';
+    position: absolute;
+    inset-inline-start: 1.1rem;
+    top: 50%;
+    width: 1.05rem;
+    height: 1.05rem;
+    margin-top: -0.525rem;
+    border: 2px solid rgba(11, 16, 36, 0.3);
+    border-top-color: #0b1024;
+    border-radius: 50%;
+    animation: cert-spin 0.7s linear infinite;
+  }
+
+  @keyframes cert-spin { to { transform: rotate(360deg); } }
+
+  .cert-status {
+    margin: 1.25rem 0 0;
+    padding: 0.85rem 1rem;
+    border-radius: 12px;
+    font-size: 0.95rem;
+    line-height: 1.6;
+    font-weight: 600;
+    color: var(--c-rose);
+    background: rgba(232, 161, 177, 0.1);
+    border: 1px solid rgba(232, 161, 177, 0.3);
+  }
+
+  .cert-success { text-align: center; }
+  .cert-success-icon { font-size: 2.6rem; line-height: 1; margin-bottom: 0.5rem; }
+  .cert-success h2 {
+    font-size: 1.4rem;
+    margin: 0 0 0.4rem;
+    color: var(--c-gold-soft);
+  }
+  .cert-success > p { margin: 0 0 1.5rem; color: var(--c-ink-dim); }
+
+  .cert-download {
+    display: block;
+    min-height: 52px;
+    line-height: 52px;
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #0b1024;
+    text-decoration: none;
+    background: linear-gradient(135deg, var(--c-gold-soft), var(--c-gold) 62%, #8a6423);
+    border-radius: 999px;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+  }
+
+  .cert-download:hover { transform: translateY(-2px); box-shadow: 0 12px 28px rgba(201, 160, 92, 0.35); }
+  .cert-download:focus-visible { outline: 3px solid var(--c-gold-soft); outline-offset: 3px; }
+
+  .cert-reset {
+    margin-top: 0.9rem;
+    background: none;
+    border: none;
+    font-family: inherit;
+    font-size: 0.92rem;
+    color: var(--c-ink-dim);
+    text-decoration: underline;
+    cursor: pointer;
+    padding: 0.5rem;
+  }
+  .cert-reset:focus-visible { outline: 2px solid var(--c-gold-soft); outline-offset: 2px; border-radius: 6px; }
+
+  .cert-privacy {
+    margin: 1.75rem 0 0;
+    font-size: 0.82rem;
+    color: rgba(243, 239, 227, 0.45);
+  }
+
+  [hidden] { display: none !important; }
+
+  @media (max-width: 400px) {
+    .cert-page { padding: 1.25rem 0.9rem; }
+    .cert-card { padding: 2rem 1.25rem; border-radius: 16px; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+  }
+</style>

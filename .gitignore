@@ -6,3 +6,7 @@ dist/
 
 # Local Netlify folder
 .netlify
+
+# Generated certificates and local PDF previews — may contain personal data
+scripts/output/
+scripts/_*.png

@@ -4,3 +4,9 @@
 
 [build.environment]
   NODE_VERSION = "20"
+
+[functions]
+  # The certificate template and the Hebrew fonts are read at runtime by
+  # netlify/functions/certificate.mjs, so they must be bundled with it.
+  # They intentionally live outside publish/ so they are never served publicly.
+  included_files = ["templates/**"]
