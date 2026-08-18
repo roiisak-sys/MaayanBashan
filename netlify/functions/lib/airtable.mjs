@@ -28,6 +28,10 @@ export function getAirtableConfig(env = process.env) {
     statusField: env.AIRTABLE_STATUS_FIELD || 'fld9Smx5O2HTn4zus',
     courseField: env.AIRTABLE_COURSE_FIELD || 'fldy6DhZezw4gVZuq',
 
+    // Formulas can only reference fields by name, so this one is the display
+    // name rather than the ID. Must be updated if the column is renamed.
+    statusFieldName: env.AIRTABLE_STATUS_FIELD_NAME || 'סטטוס',
+
     // Eligibility: the July 2026 cohort, fully paid.
     targetCourseRecordId: env.TARGET_COURSE_RECORD_ID || 'recKv98sOFZmx3cOT',
     paidStatus: env.PAID_STATUS || 'שילם',
@@ -61,13 +65,21 @@ export function getAirtableConfig(env = process.env) {
 export async function findEligibleParticipant({ name, idNumber, env = process.env, fetchImpl = fetch }) {
   const config = getAirtableConfig(env);
 
-  const formula = `AND({${config.statusField}} = '${config.paidStatus.replace(/'/g, "\\'")}', FIND('${config.targetCourseRecordId}', ARRAYJOIN({${config.courseField}})) > 0)`;
-
+  // filterByFormula can only reference fields by NAME (field IDs are not valid
+  // inside a formula), so the status name is configurable separately from the
+  // field ID used to read values back.
   const params = new URLSearchParams();
-  params.set('filterByFormula', formula);
+  params.set(
+    'filterByFormula',
+    `{${config.statusFieldName}} = '${config.paidStatus.replace(/'/g, "\\'")}'`
+  );
   params.set('pageSize', '100');
+  // Without this the response is keyed by field NAME; we want IDs so that
+  // renaming a Hebrew column in the Airtable UI cannot break the lookup.
+  params.set('returnFieldsByFieldId', 'true');
   params.append('fields[]', config.nameField);
   params.append('fields[]', config.idField);
+  params.append('fields[]', config.courseField);
 
   const records = [];
   let offset;
@@ -98,9 +110,18 @@ export async function findEligibleParticipant({ name, idNumber, env = process.en
   const wantedId = normalizeId(idNumber);
   if (!wantedName || !wantedId) return null;
 
-  // Identity is established by name against the already-filtered eligible
-  // cohort. The ID is then reconciled against whatever is on file.
-  const matches = records.filter(
+  // Cohort membership is checked here rather than in the formula: a
+  // linked-record field cannot be matched on record ID from within a formula
+  // (ARRAYJOIN yields the linked records' display names, not their IDs), but
+  // the REST API returns the field as an array of record IDs, which is exact.
+  const cohort = records.filter((record) => {
+    const links = record.fields?.[config.courseField];
+    return Array.isArray(links) && links.includes(config.targetCourseRecordId);
+  });
+
+  // Identity is established by name against the eligible cohort. The ID is
+  // then reconciled against whatever is on file.
+  const matches = cohort.filter(
     (record) => normalizeName(record.fields?.[config.nameField]) === wantedName
   );
 

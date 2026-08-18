@@ -24,6 +24,9 @@ const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 const NAME_FIELD = 'fldtIhXNTeKPPs41O';
 const ID_FIELD = 'fldFPugfcZDT70yhP';
+const COURSE_FIELD = 'fldCourse';
+const TARGET_COURSE = 'recJuly2026';
+const OTHER_COURSE = 'recDec2025';
 
 const BASE_ENV = {
   AIRTABLE_PAT: 'test-token',
@@ -38,12 +41,17 @@ const BASE_ENV = {
 };
 
 /**
- * Fake Airtable. The real API applies filterByFormula server-side, so the
- * fake only ever returns records that already satisfy "July 2026 + paid" —
- * ineligible people are modelled by simply not being in this list, which is
- * exactly what the real query does.
+ * Fake Airtable modelling the real REST contract:
+ *   - filterByFormula narrows to paid records only (the course link CANNOT be
+ *     filtered in a formula, so every paid record is returned regardless of
+ *     cohort and the caller must exclude other courses itself)
+ *   - returnFieldsByFieldId means keys are field IDs
+ *   - a multipleRecordLinks field comes back as an array of record IDs
+ *
+ * Getting this shape wrong is what allowed a broken query to pass tests while
+ * failing against the live API.
  */
-function fakeAirtable(eligibleRecords, { onWrite } = {}) {
+function fakeAirtable(paidRecords, { onWrite } = {}) {
   return async (url, options) => {
     if (options?.method === 'PATCH') {
       onWrite?.({ url, body: JSON.parse(options.body) });
@@ -53,23 +61,26 @@ function fakeAirtable(eligibleRecords, { onWrite } = {}) {
       ok: true,
       status: 200,
       json: async () => ({
-        records: eligibleRecords.map((fields, i) => ({ id: `recFake${i}`, fields })),
+        records: paidRecords.map((fields, i) => ({ id: `recFake${i}`, fields })),
       }),
     };
   };
 }
 
+/** Helper: a paid record in the target cohort. */
+const inCohort = (fields) => ({ [COURSE_FIELD]: [TARGET_COURSE], ...fields });
+
 // Mirrors production today: names present, ID column blank.
 const COHORT = [
-  { [NAME_FIELD]: 'ישראל ישראלי' },
-  { [NAME_FIELD]: ' מור חסון' },
-  { [NAME_FIELD]: 'Yaffa Adler' },
+  inCohort({ [NAME_FIELD]: 'ישראל ישראלי' }),
+  inCohort({ [NAME_FIELD]: ' מור חסון' }),
+  inCohort({ [NAME_FIELD]: 'Yaffa Adler' }),
 ];
 
 // A cohort where IDs have already been backfilled.
 const COHORT_WITH_IDS = [
-  { [NAME_FIELD]: 'ישראל ישראלי', [ID_FIELD]: '012345678' },
-  { [NAME_FIELD]: ' מור חסון', [ID_FIELD]: '311111118' },
+  inCohort({ [NAME_FIELD]: 'ישראל ישראלי', [ID_FIELD]: '012345678' }),
+  inCohort({ [NAME_FIELD]: ' מור חסון', [ID_FIELD]: '311111118' }),
 ];
 
 describe('name normalization', () => {
@@ -266,9 +277,8 @@ describe('eligibility verification', () => {
     assert.equal(result, null);
   });
 
-  test('rejects someone not in the paid July 2026 cohort', async () => {
-    // Unpaid / other-cohort participants are filtered out by the Airtable
-    // query, so they simply never appear in the result set.
+  test('rejects someone who is unpaid', async () => {
+    // Unpaid records are excluded by filterByFormula, so they never appear.
     const result = await findEligibleParticipant({
       name: 'נרשמת שלא שילמה',
       idNumber: '012345678',
@@ -276,6 +286,69 @@ describe('eligibility verification', () => {
       fetchImpl: fakeAirtable(COHORT),
     });
     assert.equal(result, null);
+  });
+
+  test('REGRESSION: excludes a paid participant from a DIFFERENT course', async () => {
+    // The course link cannot be filtered inside a formula, so every paid
+    // record arrives and the cohort check must happen server-side. A previous
+    // version filtered on the formula alone and matched nobody at all.
+    const result = await findEligibleParticipant({
+      name: 'בוגרת קורס אחר',
+      idNumber: '012345678',
+      env: BASE_ENV,
+      fetchImpl: fakeAirtable([
+        ...COHORT,
+        { [NAME_FIELD]: 'בוגרת קורס אחר', [COURSE_FIELD]: [OTHER_COURSE] },
+      ]),
+    });
+    assert.equal(result, null, 'other-cohort participant must not be issued a certificate');
+  });
+
+  test('REGRESSION: matches a participant linked to several courses', async () => {
+    const result = await findEligibleParticipant({
+      name: 'בוגרת שני קורסים',
+      idNumber: '012345678',
+      env: BASE_ENV,
+      fetchImpl: fakeAirtable([
+        { [NAME_FIELD]: 'בוגרת שני קורסים', [COURSE_FIELD]: [OTHER_COURSE, TARGET_COURSE] },
+      ]),
+    });
+    assert.ok(result, 'membership of the target cohort is what matters');
+  });
+
+  test('REGRESSION: a record with no course link is never eligible', async () => {
+    const result = await findEligibleParticipant({
+      name: 'ליד ללא קורס',
+      idNumber: '012345678',
+      env: BASE_ENV,
+      fetchImpl: fakeAirtable([{ [NAME_FIELD]: 'ליד ללא קורס' }]),
+    });
+    assert.equal(result, null);
+  });
+
+  test('requests field IDs back, and filters paid in the formula by field NAME', async () => {
+    // Formulas cannot reference field IDs; responses are name-keyed unless
+    // returnFieldsByFieldId is set. Both were wrong in an earlier version.
+    let captured;
+    await findEligibleParticipant({
+      name: 'ישראל ישראלי',
+      idNumber: '012345678',
+      env: BASE_ENV,
+      fetchImpl: async (url) => {
+        captured = url;
+        return { ok: true, status: 200, json: async () => ({ records: [] }) };
+      },
+    });
+    const params = new URL(captured).searchParams;
+    assert.equal(params.get('returnFieldsByFieldId'), 'true');
+
+    const formula = params.get('filterByFormula');
+    assert.equal(formula, "{סטטוס} = 'שילם'", 'formula must reference the field by name');
+    assert.ok(!formula.includes('{fld'), 'formula must not reference field IDs');
+    assert.ok(!formula.includes('ARRAYJOIN'), 'course link cannot be formula-filtered');
+
+    // The course link must be requested so it can be checked server-side.
+    assert.ok(params.getAll('fields[]').includes(COURSE_FIELD));
   });
 
   test('tolerates stored names with stray whitespace', async () => {
