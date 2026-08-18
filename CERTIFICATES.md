@@ -78,8 +78,24 @@ Once the ID column is populated, `CERT_REQUIRE_ID=true` makes verification
 strict name + phone + ID. `CERT_WRITE_ID=false` disables Airtable writes
 entirely.
 
-Israeli ID check digits are validated before anything is written or printed, so
-typos cannot poison the CRM or land on a certificate.
+### ID validation is deliberately permissive
+
+The submitted ID is checked only for shape (4–10 digits after normalization).
+The Israeli check digit is computed but **does not block** — it is recorded in
+the logs as `checksumOk` so an odd entry stays visible.
+
+This is intentional. The ID authenticates nobody; it is only printed on the
+certificate. Refusing a real graduate — because their number is unusual (foreign
+resident, passport used at registration) or because an invisible bidi character
+came along with a pasted value — is a much worse outcome than an unusual number
+appearing on a PDF.
+
+Set `CERT_VALIDATE_ID_CHECKSUM=true` to enforce the check digit once the data
+justifies it.
+
+Note that normalization strips invisible Unicode bidi controls from the name,
+phone and ID. These are routinely introduced by copy-pasting from WhatsApp or
+any RTL document, and the `Phone` column in this base visibly contains them.
 
 ---
 
