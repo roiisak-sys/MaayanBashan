@@ -13,24 +13,44 @@ from the original designed template.
 
 ---
 
-## ⚠️ Required before this can work in production
+## Verification model
 
-**The `ID` column in Airtable is currently empty for every record.**
+The `ID` column in Airtable started out empty for all 92 paid July 2026
+participants, so the ID cannot be used as a pre-existing secret. The system
+therefore works in both directions:
 
-At the time of building, all 92 paid July 2026 participants had a populated name
-but **no ID number stored**. ID verification therefore cannot match anyone, and
-every request will correctly return the generic failure message.
+1. **Identity is established by name** against the paid July 2026 cohort.
+2. **The submitted ID is printed on the certificate.**
+3. **If the record has no ID stored, the submitted ID is written back**, so the
+   CRM fills itself in as graduates collect their certificates.
+4. **Once an ID is on file it becomes authoritative.** A later request for the
+   same name with a *different* ID is refused — "trust on first use".
 
-Choose one of these before launch:
+An existing ID is never overwritten.
 
-1. **Populate the `ID` field** in the `לידים פרטי` table for the July 2026
-   cohort. Nothing else needs changing — this is the intended, secure setup.
-2. **Temporarily fall back to name-only verification** by setting
-   `CERT_REQUIRE_ID=false`.
-   This is materially less secure: anyone who knows a participant's name can
-   download that participant's certificate. Only use it as a stopgap.
+### Security trade-off — read before launch
 
-Everything else is complete and tested.
+Because only the name is verified, **anyone who knows a participant's name can
+download that participant's certificate** until that participant has claimed
+theirs. Several names in this cohort are single first names (`חגית`, `רוזנה`,
+`אורה`, `לבנת`, `הנאדי`), which are guessable.
+
+Consequences worth understanding:
+
+- A wrong ID submitted first sticks, and would then lock the real participant
+  out (they would be refused for having the "wrong" ID). If that happens, clear
+  that record's `ID` field in Airtable and they can re-claim.
+- Certificates are low-value and the link is distributed privately by WhatsApp,
+  which is why this was judged acceptable. It is a deliberate trade-off, not an
+  oversight.
+
+To tighten this later, once the column is populated set `CERT_REQUIRE_ID=true`
+and verification becomes strict name + ID.
+To disable Airtable writes entirely, set `CERT_WRITE_ID=false` — certificates
+are still issued, the ID is just not recorded.
+
+Israeli ID check digits are validated before anything is written or printed, so
+typos cannot poison the CRM or land on a certificate.
 
 ---
 
@@ -59,9 +79,9 @@ A certificate is issued only when **all** of the following hold:
 | Condition | Source |
 |---|---|
 | Name matches (normalized) | `שם` field |
-| ID matches (normalized) | `ID` field |
 | Course = July 2026 | linked record `recKv98sOFZmx3cOT` in `מוצרים` |
 | Status = paid | `סטטוס` = `שילם` |
+| ID is valid, and matches any ID already stored | `ID` field |
 
 The course and status filters are applied by Airtable via `filterByFormula`; the
 name and ID are compared server-side after normalization, because the stored data
@@ -78,7 +98,7 @@ Copy `.env.example` to `.env` for local work; set the same values in
 
 | Variable | Purpose |
 |---|---|
-| `AIRTABLE_PAT` | **Required.** PAT with `data.records:read` on the CRM base |
+| `AIRTABLE_PAT` | **Required.** PAT with `data.records:read` **and `:write`** on the CRM base (write is needed to back-fill IDs). Falls back to `AIRTABLE_TOKEN` |
 | `AIRTABLE_BASE_ID` | Defaults to the Maayan Bashan CRM base |
 | `AIRTABLE_TABLE_NAME` | Table ID for `לידים פרטי` |
 | `AIRTABLE_NAME_FIELD` | Field ID of the name column |
@@ -87,7 +107,8 @@ Copy `.env.example` to `.env` for local work; set the same values in
 | `AIRTABLE_COURSE_FIELD` | Field ID of the linked-course column |
 | `TARGET_COURSE_RECORD_ID` | Record ID of the target cohort |
 | `PAID_STATUS` | Status value meaning paid (`שילם`) |
-| `CERT_REQUIRE_ID` | `true` (default) requires the ID to match |
+| `CERT_REQUIRE_ID` | `true` = strict name+ID. Default `false` (name + trust-on-first-use) |
+| `CERT_WRITE_ID` | `false` disables writing IDs back to Airtable. Default on |
 | `CERT_RATE_LIMIT` | Requests per window per client (default 20) |
 | `CERT_RATE_WINDOW_MS` | Window length in ms (default 600000) |
 | `CERT_NAME_*` / `CERT_ID_*` | Optional PDF coordinate overrides |

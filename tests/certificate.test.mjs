@@ -16,7 +16,7 @@ import {
   formatIdForDisplay,
   toVisualOrder,
 } from '../netlify/functions/lib/text.mjs';
-import { findEligibleParticipant, AirtableUnavailableError } from '../netlify/functions/lib/airtable.mjs';
+import { findEligibleParticipant, recordParticipantId, AirtableUnavailableError } from '../netlify/functions/lib/airtable.mjs';
 import { generateCertificate, buildFilename, getLayout } from '../netlify/functions/lib/certificate.mjs';
 import { checkRateLimit, resetRateLimits, getClientIp } from '../netlify/functions/lib/rate-limit.mjs';
 
@@ -35,7 +35,6 @@ const BASE_ENV = {
   AIRTABLE_COURSE_FIELD: 'fldCourse',
   TARGET_COURSE_RECORD_ID: 'recJuly2026',
   PAID_STATUS: 'שילם',
-  CERT_REQUIRE_ID: 'true',
 };
 
 /**
@@ -44,18 +43,33 @@ const BASE_ENV = {
  * ineligible people are modelled by simply not being in this list, which is
  * exactly what the real query does.
  */
-function fakeAirtable(eligibleRecords) {
-  return async () => ({
-    ok: true,
-    status: 200,
-    json: async () => ({ records: eligibleRecords.map((fields) => ({ id: 'rec' + Math.random(), fields })) }),
-  });
+function fakeAirtable(eligibleRecords, { onWrite } = {}) {
+  return async (url, options) => {
+    if (options?.method === 'PATCH') {
+      onWrite?.({ url, body: JSON.parse(options.body) });
+      return { ok: true, status: 200, json: async () => ({}) };
+    }
+    return {
+      ok: true,
+      status: 200,
+      json: async () => ({
+        records: eligibleRecords.map((fields, i) => ({ id: `recFake${i}`, fields })),
+      }),
+    };
+  };
 }
 
+// Mirrors production today: names present, ID column blank.
 const COHORT = [
+  { [NAME_FIELD]: 'ישראל ישראלי' },
+  { [NAME_FIELD]: ' מור חסון' },
+  { [NAME_FIELD]: 'Yaffa Adler' },
+];
+
+// A cohort where IDs have already been backfilled.
+const COHORT_WITH_IDS = [
   { [NAME_FIELD]: 'ישראל ישראלי', [ID_FIELD]: '012345678' },
   { [NAME_FIELD]: ' מור חסון', [ID_FIELD]: '311111118' },
-  { [NAME_FIELD]: 'Yaffa Adler', [ID_FIELD]: '987654321' },
 ];
 
 describe('name normalization', () => {
@@ -138,7 +152,7 @@ describe('RTL / bidi handling', () => {
 });
 
 describe('eligibility verification', () => {
-  test('succeeds for a paid July 2026 participant with matching name + ID', async () => {
+  test('succeeds by name for a paid July 2026 participant with no ID on file', async () => {
     const result = await findEligibleParticipant({
       name: 'ישראל ישראלי',
       idNumber: '012345678',
@@ -147,17 +161,99 @@ describe('eligibility verification', () => {
     });
     assert.ok(result);
     assert.equal(result.displayName, 'ישראל ישראלי');
+    // The submitted ID is used verbatim on the certificate.
     assert.equal(result.idNumber, '012345678');
+    // ...and flagged to be written back, since the field was blank.
+    assert.equal(result.shouldRecordId, true);
   });
 
-  test('rejects a wrong ID', async () => {
-    const result = await findEligibleParticipant({
+  test('writes the submitted ID back to the blank record', async () => {
+    const writes = [];
+    const participant = await findEligibleParticipant({
       name: 'ישראל ישראלי',
-      idNumber: '999999999',
+      idNumber: '012345678',
       env: BASE_ENV,
       fetchImpl: fakeAirtable(COHORT),
     });
+    await recordParticipantId({
+      recordId: participant.recordId,
+      idNumber: participant.idNumber,
+      env: BASE_ENV,
+      fetchImpl: fakeAirtable(COHORT, { onWrite: (w) => writes.push(w) }),
+    });
+    assert.equal(writes.length, 1);
+    assert.equal(writes[0].body.fields[ID_FIELD], '012345678');
+    assert.match(writes[0].url, /recFake0$/);
+  });
+
+  test('preserves leading zeros when writing back', async () => {
+    const writes = [];
+    await recordParticipantId({
+      recordId: 'recFake0',
+      idNumber: '012345678',
+      env: BASE_ENV,
+      fetchImpl: fakeAirtable(COHORT, { onWrite: (w) => writes.push(w) }),
+    });
+    assert.equal(writes[0].body.fields[ID_FIELD], '012345678');
+    assert.equal(typeof writes[0].body.fields[ID_FIELD], 'string');
+  });
+
+  test('accepts the matching ID once one is on file, without rewriting', async () => {
+    const result = await findEligibleParticipant({
+      name: 'ישראל ישראלי',
+      idNumber: '012345678',
+      env: BASE_ENV,
+      fetchImpl: fakeAirtable(COHORT_WITH_IDS),
+    });
+    assert.ok(result);
+    assert.equal(result.shouldRecordId, false);
+  });
+
+  test('refuses a different ID once one is on file (trust on first use)', async () => {
+    // Protects a participant whose ID is already recorded from someone else
+    // requesting their certificate using only their name.
+    const result = await findEligibleParticipant({
+      name: 'ישראל ישראלי',
+      idNumber: '311111118',
+      env: BASE_ENV,
+      fetchImpl: fakeAirtable(COHORT_WITH_IDS),
+    });
     assert.equal(result, null);
+  });
+
+  test('never overwrites an existing ID', async () => {
+    const result = await findEligibleParticipant({
+      name: ' מור חסון',
+      idNumber: '311111118',
+      env: BASE_ENV,
+      fetchImpl: fakeAirtable(COHORT_WITH_IDS),
+    });
+    assert.ok(result);
+    assert.equal(result.shouldRecordId, false, 'must not rewrite a populated field');
+  });
+
+  test('write-back can be disabled', async () => {
+    const result = await findEligibleParticipant({
+      name: 'ישראל ישראלי',
+      idNumber: '012345678',
+      env: { ...BASE_ENV, CERT_WRITE_ID: 'false' },
+      fetchImpl: fakeAirtable(COHORT),
+    });
+    assert.ok(result, 'still issues the certificate');
+    assert.equal(result.shouldRecordId, false, 'but records nothing');
+  });
+
+  test('strict mode still requires a stored ID to match', async () => {
+    const strict = { ...BASE_ENV, CERT_REQUIRE_ID: 'true' };
+    // Blank stored ID cannot satisfy strict verification.
+    assert.equal(
+      await findEligibleParticipant({ name: 'ישראל ישראלי', idNumber: '012345678', env: strict, fetchImpl: fakeAirtable(COHORT) }),
+      null
+    );
+    // Populated and matching does.
+    assert.ok(
+      await findEligibleParticipant({ name: 'ישראל ישראלי', idNumber: '012345678', env: strict, fetchImpl: fakeAirtable(COHORT_WITH_IDS) })
+    );
   });
 
   test('rejects a wrong name', async () => {
@@ -203,18 +299,6 @@ describe('eligibility verification', () => {
     assert.ok(result);
   });
 
-  test('refuses when the stored ID is empty, even if the name matches', async () => {
-    // Guards the current production state: the ID column is unpopulated, and
-    // an empty stored value must never be treated as "matches anything".
-    const result = await findEligibleParticipant({
-      name: 'ישראל ישראלי',
-      idNumber: '012345678',
-      env: BASE_ENV,
-      fetchImpl: fakeAirtable([{ [NAME_FIELD]: 'ישראל ישראלי', [ID_FIELD]: '' }]),
-    });
-    assert.equal(result, null);
-  });
-
   test('refuses ambiguous duplicate names rather than guessing', async () => {
     const result = await findEligibleParticipant({
       name: 'ישראל ישראלי',
@@ -226,16 +310,6 @@ describe('eligibility verification', () => {
       ]),
     });
     assert.equal(result, null);
-  });
-
-  test('name-only mode works when explicitly enabled', async () => {
-    const result = await findEligibleParticipant({
-      name: 'ישראל ישראלי',
-      idNumber: '',
-      env: { ...BASE_ENV, CERT_REQUIRE_ID: 'false' },
-      fetchImpl: fakeAirtable([{ [NAME_FIELD]: 'ישראל ישראלי' }]),
-    });
-    assert.ok(result);
   });
 
   test('surfaces Airtable outages distinctly from a failed match', async () => {

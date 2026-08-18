@@ -32,9 +32,13 @@ export function getAirtableConfig(env = process.env) {
     targetCourseRecordId: env.TARGET_COURSE_RECORD_ID || 'recKv98sOFZmx3cOT',
     paidStatus: env.PAID_STATUS || 'שילם',
 
-    // When the ID column is not populated yet, ID matching cannot succeed for
-    // anyone. See README — this must be switched on deliberately.
-    requireId: env.CERT_REQUIRE_ID !== 'false',
+    // Strict mode: the submitted ID must already match a stored ID.
+    // Off by default because the ID column starts out empty — see README.
+    requireId: env.CERT_REQUIRE_ID === 'true',
+
+    // Trust-on-first-use: when a participant has no ID on file, store the one
+    // they supply so it becomes a verification factor for every later request.
+    recordId: env.CERT_WRITE_ID !== 'false',
   };
 
   if (!config.token) {
@@ -92,34 +96,64 @@ export async function findEligibleParticipant({ name, idNumber, env = process.en
 
   const wantedName = normalizeName(name);
   const wantedId = normalizeId(idNumber);
-  if (!wantedName) return null;
-  if (config.requireId && !wantedId) return null;
+  if (!wantedName || !wantedId) return null;
 
-  const matches = records.filter((record) => {
-    const fields = record.fields ?? {};
-    const storedName = normalizeName(fields[config.nameField]);
-    if (storedName !== wantedName) return false;
-
-    if (!config.requireId) return true;
-
-    const storedId = normalizeId(fields[config.idField]);
-    // An empty stored ID can never satisfy ID verification — refuse rather
-    // than silently downgrading to name-only matching.
-    if (!storedId) return false;
-    return storedId === wantedId;
-  });
+  // Identity is established by name against the already-filtered eligible
+  // cohort. The ID is then reconciled against whatever is on file.
+  const matches = records.filter(
+    (record) => normalizeName(record.fields?.[config.nameField]) === wantedName
+  );
 
   // Ambiguity is treated as failure: if two eligible participants share a
-  // normalized name we must not guess which certificate to issue.
+  // normalized name we must not guess whose certificate to issue.
   if (matches.length !== 1) return null;
 
-  const fields = matches[0].fields ?? {};
+  const record = matches[0];
+  const fields = record.fields ?? {};
+  const storedId = normalizeId(fields[config.idField]);
+
+  if (config.requireId) {
+    // Strict: an ID must be on file and must match.
+    if (!storedId || storedId !== wantedId) return null;
+  } else if (storedId && storedId !== wantedId) {
+    // Trust-on-first-use: once an ID is recorded it is authoritative, so a
+    // mismatch is refused. This protects a participant whose ID is already
+    // stored from anyone else requesting their certificate by name alone.
+    return null;
+  }
+
   return {
-    // The stored spelling is used on the certificate so the printed name is
-    // the one Maayan has on record, not whatever casing the user typed.
+    recordId: record.id,
+    // The stored spelling goes on the certificate, so the printed name is the
+    // one Maayan has on record rather than whatever casing the user typed.
     displayName: String(fields[config.nameField] ?? '').replace(/\s+/g, ' ').trim(),
-    idNumber: config.requireId
-      ? normalizeId(fields[config.idField])
-      : normalizeId(idNumber),
+    idNumber: storedId || wantedId,
+    // Only true when the field was blank, so a write never overwrites data.
+    shouldRecordId: !storedId && config.recordId,
   };
+}
+
+/**
+ * Store an ID against a participant record.
+ *
+ * Called only when the field was previously empty. Failure is non-fatal: the
+ * certificate has already been earned, so a write problem must not block the
+ * download — it is logged and swallowed by the caller.
+ */
+export async function recordParticipantId({ recordId, idNumber, env = process.env, fetchImpl = fetch }) {
+  const config = getAirtableConfig(env);
+  const url = `https://api.airtable.com/v0/${config.baseId}/${config.tableId}/${recordId}`;
+
+  const response = await fetchImpl(url, {
+    method: 'PATCH',
+    headers: {
+      Authorization: `Bearer ${config.token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ fields: { [config.idField]: normalizeId(idNumber) } }),
+  });
+
+  if (!response.ok) {
+    throw new AirtableUnavailableError(`Airtable write responded ${response.status}`);
+  }
 }

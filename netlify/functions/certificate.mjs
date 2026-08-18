@@ -13,9 +13,10 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { findEligibleParticipant, AirtableUnavailableError } from './lib/airtable.mjs';
+import { findEligibleParticipant, recordParticipantId, AirtableUnavailableError } from './lib/airtable.mjs';
 import { generateCertificate, buildFilename } from './lib/certificate.mjs';
 import { checkRateLimit, getClientIp } from './lib/rate-limit.mjs';
+import { isValidIsraeliId } from './lib/text.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 
@@ -107,6 +108,15 @@ export default async (request, context) => {
     return jsonError('INVALID_DETAILS', 401);
   }
 
+  // Reject malformed IDs before touching Airtable. Every real Israeli ID has a
+  // valid check digit, so this catches typos, keeps invalid data out of the
+  // CRM, and stops a wrong number being printed onto a certificate. It reveals
+  // nothing about who is enrolled, so a specific message is safe here.
+  if (!isValidIsraeliId(idNumber)) {
+    log({ success: false, reason: 'invalid_id_format', requestId, ms: Date.now() - startedAt });
+    return jsonError('INVALID_ID_FORMAT', 400);
+  }
+
   let participant;
   try {
     participant = await findEligibleParticipant({ name, idNumber, env });
@@ -123,9 +133,23 @@ export default async (request, context) => {
   }
 
   if (!participant) {
-    // Identical response for: unknown name, wrong ID, unpaid, wrong cohort.
+    // Identical response for: unknown name, ID conflicting with one on file,
+    // unpaid, wrong cohort.
     log({ success: false, reason: 'no_match', requestId, ms: Date.now() - startedAt });
     return jsonError('INVALID_DETAILS', 401);
+  }
+
+  // Backfill the ID onto the record when the field was blank. Deliberately
+  // best-effort: the participant is already verified and entitled to the
+  // certificate, so a write failure is logged but must not block the download.
+  let idRecorded = false;
+  if (participant.shouldRecordId) {
+    try {
+      await recordParticipantId({ recordId: participant.recordId, idNumber: participant.idNumber, env });
+      idRecorded = true;
+    } catch (error) {
+      console.error(`certificate_verification id_write_failed requestId=${requestId}: ${error.message}`);
+    }
   }
 
   let pdfBytes;
@@ -145,7 +169,7 @@ export default async (request, context) => {
     return jsonError('PDF_FAILED', 500);
   }
 
-  log({ success: true, requestId, ms: Date.now() - startedAt });
+  log({ success: true, idRecorded, requestId, ms: Date.now() - startedAt });
 
   // buildFilename yields ASCII only, so this header cannot be injected into.
   const filename = buildFilename(participant.displayName);
