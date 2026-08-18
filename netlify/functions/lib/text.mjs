@@ -117,25 +117,28 @@ function classify(char) {
 }
 
 /**
- * Convert logical-order text into visual order for PDF drawing.
+ * Split text into directional runs, ordered left-to-right for drawing.
  *
- * pdf-lib draws glyphs strictly left-to-right in the order given; it performs
- * no bidi reordering. Hebrew is not a cursive script, so no glyph shaping is
- * needed — but the character ORDER must be reversed, and naively reversing the
- * whole string corrupts embedded Latin words and digit groups
- * (e.g. a phone number or an English surname would come out backwards).
+ * Each run's text stays in LOGICAL order. This matters: pdf-lib hands text to
+ * fontkit, and fontkit reverses a string by itself when it detects an RTL
+ * script — but it does so for the whole string at once, without proper bidi
+ * segmentation. So a pure-Hebrew run comes out right, while embedded Latin or
+ * multi-digit numbers come out backwards ("Cohen" -> "nehoC", "25" -> "52").
  *
- * This is a reduced Unicode Bidi Algorithm sufficient for single-line personal
- * names: it segments the string into directional runs, reverses the run order
- * when the paragraph is RTL, and reverses characters only inside RTL runs.
- * Digits and Latin stay in their natural left-to-right order.
+ * Drawing run-by-run sidesteps that: every run is single-direction, so
+ * fontkit's own handling is correct for each one, and we control the order the
+ * runs are placed in. Pre-reversing the characters here would fight fontkit
+ * and produce doubly-reversed, unreadable text.
+ *
+ * @returns {{dir: 'rtl'|'ltr', text: string}[]} runs in visual (drawing) order
  */
-export function toVisualOrder(text) {
+export function splitDirectionalRuns(text) {
   const input = String(text ?? '');
-  if (!input) return '';
+  if (!input) return [];
 
   // Paragraph direction: RTL only if it actually contains RTL characters.
-  if (!RTL_CHAR.test(input)) return input;
+  const rtlParagraph = RTL_CHAR.test(input);
+  if (!rtlParagraph) return [{ dir: 'ltr', text: input }];
 
   const chars = Array.from(input);
   const classes = chars.map(classify);
@@ -168,9 +171,8 @@ export function toVisualOrder(text) {
     else runs.push({ dir, text: chars[i] });
   }
 
-  // Base is RTL: emit runs right-to-left, reversing glyphs inside RTL runs.
-  return runs
-    .reverse()
-    .map((run) => (run.dir === 'rtl' ? Array.from(run.text).reverse().join('') : run.text))
-    .join('');
+  // RTL paragraph: the first logical run belongs at the RIGHT, so the drawing
+  // order (left to right) is the reverse of the logical run order. Each run's
+  // characters are left untouched — fontkit reverses RTL runs itself.
+  return runs.reverse();
 }

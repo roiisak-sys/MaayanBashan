@@ -5,7 +5,9 @@
 
 import { test, describe, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
-import fs from 'node:fs/promises';
+import fontkit from '@pdf-lib/fontkit';
+import fs from 'node:fs';
+import fsp from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -16,7 +18,7 @@ import {
   isPlausibleIdNumber,
   formatIdForDisplay,
   normalizePhone,
-  toVisualOrder,
+  splitDirectionalRuns,
 } from '../netlify/functions/lib/text.mjs';
 import { findEligibleParticipant, recordParticipantId, AirtableUnavailableError } from '../netlify/functions/lib/airtable.mjs';
 import { generateCertificate, buildFilename, getLayout } from '../netlify/functions/lib/certificate.mjs';
@@ -204,37 +206,75 @@ describe('phone normalization', () => {
   });
 });
 
-describe('RTL / bidi handling', () => {
-  test('reverses pure Hebrew into visual order', () => {
-    assert.equal(toVisualOrder('ישראל ישראלי'), 'ילארשי לארשי');
+describe('RTL rendering', () => {
+  // These assert the glyph order the PDF will ACTUALLY contain, by running the
+  // same fontkit layout pdf-lib uses. Testing the helper in isolation is what
+  // previously hid a bug: the helper looked right, but fontkit applies its own
+  // reversal on top, so real certificates came out backwards.
+  const font = fontkit.create(fs.readFileSync(path.join(root, 'templates/assistant-semibold.ttf')));
+
+  /** The left-to-right glyph sequence a viewer will see. */
+  const rendered = (text) =>
+    splitDirectionalRuns(text)
+      .map((run) =>
+        font
+          .layout(run.text)
+          .glyphs.map((g) => String.fromCodePoint(...(g.codePoints ?? [])))
+          .join('')
+      )
+      .join('');
+
+  const HEBREW = /[֐-׿]+/g;
+
+  test('pure Hebrew reads correctly right-to-left', () => {
+    // Regression: 'תמר ידידים' was rendering as 'םידידי רמת' — i.e. the first
+    // letter ended up leftmost instead of rightmost.
+    for (const name of ['תמר ידידים', 'ישראל ישראלי', 'יעל סאקסטין יונה', 'מיכל בן-שאול']) {
+      const visual = rendered(name);
+      for (const word of name.match(HEBREW) ?? []) {
+        assert.ok(
+          visual.includes([...word].reverse().join('')),
+          `${word} not laid out right-to-left in ${JSON.stringify(visual)}`
+        );
+      }
+    }
   });
 
-  test('round-trips pure Hebrew', () => {
-    const original = 'יעל סאקסטין יונה';
-    assert.equal(toVisualOrder(toVisualOrder(original)), original);
+  test('the first Hebrew letter ends up rightmost', () => {
+    const visual = rendered('תמר ידידים');
+    assert.equal(visual.at(-1), 'ת', `expected 'ת' rightmost, got ${JSON.stringify(visual)}`);
+    assert.equal(visual.at(0), 'ם', `expected 'ם' leftmost, got ${JSON.stringify(visual)}`);
   });
 
-  test('leaves pure Latin untouched', () => {
-    assert.equal(toVisualOrder('Yaffa Adler'), 'Yaffa Adler');
+  test('pure Latin is unchanged', () => {
+    assert.equal(rendered('Yaffa Adler'), 'Yaffa Adler');
   });
 
-  test('keeps embedded Latin readable instead of reversing it', () => {
-    // The whole-string reversal that a naive implementation produces would be
-    // 'nehoC דוד' — the Latin surname must stay forwards.
-    const visual = toVisualOrder('דוד Cohen');
+  test('embedded Latin stays forwards', () => {
+    const visual = rendered('דוד Cohen');
     assert.ok(visual.includes('Cohen'), `expected 'Cohen' intact, got ${visual}`);
     assert.ok(!visual.includes('nehoC'));
   });
 
-  test('keeps digit groups in natural order', () => {
-    const visual = toVisualOrder('אילנה מסר 7');
-    assert.ok(visual.includes('7'));
-    assert.equal(toVisualOrder('שרה 25 לוי').includes('25'), true);
+  test('digit groups stay forwards', () => {
+    assert.ok(rendered('שרה 25 לוי').includes('25'));
+    assert.ok(!rendered('שרה 25 לוי').includes('52'));
+    assert.ok(rendered('אילנה מסר 7').includes('7'));
   });
 
   test('handles empty input', () => {
-    assert.equal(toVisualOrder(''), '');
-    assert.equal(toVisualOrder(null), '');
+    assert.deepEqual(splitDirectionalRuns(''), []);
+    assert.deepEqual(splitDirectionalRuns(null), []);
+  });
+
+  test('runs are emitted in drawing order, text left logical', () => {
+    const runs = splitDirectionalRuns('דוד Cohen');
+    // RTL paragraph: the Latin run is drawn first (leftmost).
+    assert.equal(runs[0].dir, 'ltr');
+    assert.equal(runs[0].text, 'Cohen');
+    assert.equal(runs.at(-1).dir, 'rtl');
+    // Crucially NOT pre-reversed — fontkit does that per run.
+    assert.equal(runs.at(-1).text, 'דוד ');
   });
 });
 
@@ -637,9 +677,9 @@ describe('PDF generation', () => {
   let boldFontBytes;
 
   const load = async () => {
-    templateBytes ??= await fs.readFile(path.join(root, 'templates/certificate-template.pdf'));
-    regularFontBytes ??= await fs.readFile(path.join(root, 'templates/assistant-regular.ttf'));
-    boldFontBytes ??= await fs.readFile(path.join(root, 'templates/assistant-semibold.ttf'));
+    templateBytes ??= await fsp.readFile(path.join(root, 'templates/certificate-template.pdf'));
+    regularFontBytes ??= await fsp.readFile(path.join(root, 'templates/assistant-regular.ttf'));
+    boldFontBytes ??= await fsp.readFile(path.join(root, 'templates/assistant-semibold.ttf'));
     return { templateBytes, regularFontBytes, boldFontBytes };
   };
 

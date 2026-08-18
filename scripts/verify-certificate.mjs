@@ -16,7 +16,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import fontkit from '@pdf-lib/fontkit';
 import { generateCertificate, getLayout, buildFilename } from '../netlify/functions/lib/certificate.mjs';
-import { toVisualOrder, formatIdForDisplay } from '../netlify/functions/lib/text.mjs';
+import { splitDirectionalRuns, formatIdForDisplay } from '../netlify/functions/lib/text.mjs';
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -55,10 +55,11 @@ for (const [name, idNumber] of CASES) {
   );
   if (missing.length) fail(`font is missing glyphs: ${missing.join(' ')}`);
 
-  // 2. width + auto-shrink: find the size the renderer would settle on
-  const visual = toVisualOrder(name);
+  // 2. width + auto-shrink: find the size the renderer would settle on.
+  // Width is summed per directional run, matching how the text is drawn.
+  const runs = splitDirectionalRuns(name);
   const scaleFor = (font, size) =>
-    (font.layout(visual).advanceWidth / font.unitsPerEm) * size;
+    runs.reduce((sum, run) => sum + (font.layout(run.text).advanceWidth / font.unitsPerEm) * size, 0);
 
   let size = layout.name.fontSize;
   while (scaleFor(boldFont, size) > layout.name.maxWidth && size > layout.name.minFontSize) {

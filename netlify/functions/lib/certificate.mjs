@@ -11,7 +11,7 @@
 
 import { PDFDocument, rgb } from 'pdf-lib';
 import fontkit from '@pdf-lib/fontkit';
-import { toVisualOrder, formatIdForDisplay } from './text.mjs';
+import { splitDirectionalRuns, formatIdForDisplay } from './text.mjs';
 
 /** #rrggbb -> pdf-lib rgb() */
 function hexToRgb(hex) {
@@ -72,23 +72,34 @@ export function getLayout(env = process.env) {
  * Draw text centred on `centerX`, shrinking the font if it would exceed
  * `maxWidth`, so that unusually long names stay inside the design instead of
  * bleeding past the rule.
+ *
+ * The text is drawn one directional run at a time, left to right. Handing the
+ * whole string to pdf-lib in one call would let fontkit apply a single global
+ * reversal, which is right for pure Hebrew but silently corrupts any embedded
+ * Latin word or multi-digit number.
  */
 function drawCentered(page, text, font, slot) {
+  const runs = splitDirectionalRuns(text);
+  if (runs.length === 0) return { size: slot.fontSize, width: 0 };
+
+  const totalWidth = (size) =>
+    runs.reduce((sum, run) => sum + font.widthOfTextAtSize(run.text, size), 0);
+
   let size = slot.fontSize;
-  let width = font.widthOfTextAtSize(text, size);
+  let width = totalWidth(size);
 
   while (width > slot.maxWidth && size > slot.minFontSize) {
     size -= 0.5;
-    width = font.widthOfTextAtSize(text, size);
+    width = totalWidth(size);
   }
 
-  page.drawText(text, {
-    x: slot.centerX - width / 2,
-    y: slot.baselineY,
-    size,
-    font,
-    color: hexToRgb(slot.color),
-  });
+  let x = slot.centerX - width / 2;
+  const color = hexToRgb(slot.color);
+
+  for (const run of runs) {
+    page.drawText(run.text, { x, y: slot.baselineY, size, font, color });
+    x += font.widthOfTextAtSize(run.text, size);
+  }
 
   return { size, width };
 }
@@ -132,9 +143,7 @@ export async function generateCertificate({
     throw new Error('Certificate template is missing the expected page');
   }
 
-  // Hebrew must be reordered to visual order before drawing: pdf-lib emits
-  // glyphs in the given order and does no bidi resolution of its own.
-  drawCentered(namePage, toVisualOrder(name), layout.name.bold ? bold : regular, layout.name);
+  drawCentered(namePage, name, layout.name.bold ? bold : regular, layout.name);
 
   // The ID is digits only, so it stays left-to-right; formatting pads it back
   // to the canonical 9 digits without ever treating it as a number.
