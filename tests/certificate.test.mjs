@@ -18,7 +18,7 @@ import {
 } from '../netlify/functions/lib/text.mjs';
 import { findEligibleParticipant, AirtableUnavailableError } from '../netlify/functions/lib/airtable.mjs';
 import { generateCertificate, buildFilename, getLayout } from '../netlify/functions/lib/certificate.mjs';
-import { checkRateLimit, resetRateLimits } from '../netlify/functions/lib/rate-limit.mjs';
+import { checkRateLimit, resetRateLimits, getClientIp } from '../netlify/functions/lib/rate-limit.mjs';
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -290,6 +290,45 @@ describe('rate limiting', () => {
     assert.equal(checkRateLimit('9.9.9.9', { ...options, now: start }).allowed, true);
     assert.equal(checkRateLimit('9.9.9.9', { ...options, now: start + 500 }).allowed, false);
     assert.equal(checkRateLimit('9.9.9.9', { ...options, now: start + 1500 }).allowed, true);
+  });
+});
+
+describe('caller identification for rate limiting', () => {
+  const req = (headers = {}) => ({
+    headers: { get: (name) => headers[name.toLowerCase()] ?? null },
+  });
+
+  test('prefers the Netlify context IP', () => {
+    const { key, source } = getClientIp(req(), { ip: '203.0.113.9' });
+    assert.equal(key, '203.0.113.9');
+    assert.equal(source, 'context');
+  });
+
+  test('falls back through the proxy headers', () => {
+    assert.equal(getClientIp(req({ 'x-nf-client-connection-ip': '198.51.100.2' })).key, '198.51.100.2');
+    assert.equal(getClientIp(req({ 'x-forwarded-for': '198.51.100.7, 10.0.0.1' })).key, '198.51.100.7');
+  });
+
+  test('REGRESSION: unidentifiable callers must not share one bucket', () => {
+    // Previously this returned the constant 'unknown' for everyone, so a single
+    // noisy client could rate-limit every other visitor on the site.
+    const a = getClientIp(req({ 'user-agent': 'iPhone Safari', 'accept-language': 'he-IL' }));
+    const b = getClientIp(req({ 'user-agent': 'Android Chrome', 'accept-language': 'en-US' }));
+
+    assert.notEqual(a.key, b.key, 'distinct clients must get distinct keys');
+    assert.equal(a.source, 'fingerprint');
+
+    resetRateLimits();
+    const options = { limit: 1, windowMs: 60_000 };
+    assert.equal(checkRateLimit(a.key, options).allowed, true);
+    // Exhausting client A must leave client B unaffected.
+    assert.equal(checkRateLimit(a.key, options).allowed, false);
+    assert.equal(checkRateLimit(b.key, options).allowed, true);
+  });
+
+  test('the same client is identified consistently', () => {
+    const headers = { 'user-agent': 'iPhone Safari', 'accept-language': 'he-IL' };
+    assert.equal(getClientIp(req(headers)).key, getClientIp(req(headers)).key);
   });
 });
 

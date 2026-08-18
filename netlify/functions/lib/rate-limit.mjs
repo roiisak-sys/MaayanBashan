@@ -55,17 +55,50 @@ export function resetRateLimits() {
   buckets.clear();
 }
 
+/** FNV-1a — small, dependency-free, non-cryptographic. */
+function hash(value) {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < value.length; i += 1) {
+    h ^= value.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return (h >>> 0).toString(36);
+}
+
 /**
- * Best-effort client IP. Netlify populates x-nf-client-connection-ip; the
- * others are fallbacks for local dev and other hosts.
+ * Resolve a rate-limit key for the caller.
+ *
+ * Netlify Functions v2 exposes the client IP on the context argument; the
+ * headers are fallbacks for other hosts and local dev.
+ *
+ * IMPORTANT: when no IP can be determined we must NOT fall back to a single
+ * shared constant. Doing so puts every visitor into one bucket, so one noisy
+ * client locks out everybody — which is exactly what happened in testing.
+ * Instead we derive a coarse per-client fingerprint. It is weaker than an IP
+ * (several users can collide), but it fails towards "limit the individual"
+ * rather than "limit the whole world".
+ *
+ * @returns {{key: string, source: string}} source is safe to log; key is not.
  */
-export function getClientIp(request) {
+export function getClientIp(request, context) {
+  if (context?.ip) return { key: context.ip, source: 'context' };
+
   const headers = request.headers;
+
   const direct = headers.get('x-nf-client-connection-ip');
-  if (direct) return direct;
+  if (direct) return { key: direct, source: 'nf-header' };
 
   const forwarded = headers.get('x-forwarded-for');
-  if (forwarded) return forwarded.split(',')[0].trim();
+  if (forwarded) return { key: forwarded.split(',')[0].trim(), source: 'forwarded' };
 
-  return headers.get('client-ip') || 'unknown';
+  const clientIp = headers.get('client-ip');
+  if (clientIp) return { key: clientIp, source: 'client-ip' };
+
+  const fingerprint = [
+    headers.get('user-agent') ?? '',
+    headers.get('accept-language') ?? '',
+    headers.get('sec-ch-ua') ?? '',
+  ].join('|');
+
+  return { key: `fp:${hash(fingerprint)}`, source: 'fingerprint' };
 }

@@ -63,7 +63,7 @@ function log(fields) {
   console.log(`certificate_verification ${parts.join(' ')}`);
 }
 
-export default async (request) => {
+export default async (request, context) => {
   const startedAt = Date.now();
   const requestId = Math.random().toString(36).slice(2, 10);
   const env = process.env;
@@ -72,11 +72,15 @@ export default async (request) => {
     return jsonError('METHOD_NOT_ALLOWED', 405);
   }
 
-  const limit = Number(env.CERT_RATE_LIMIT || 10);
+  const limit = Number(env.CERT_RATE_LIMIT || 20);
   const windowMs = Number(env.CERT_RATE_WINDOW_MS || 10 * 60 * 1000);
-  const rate = checkRateLimit(getClientIp(request), { limit, windowMs });
+  // `source` records how the caller was identified (never the identity itself),
+  // so a misconfigured host that silently degrades to fingerprinting is visible
+  // in the logs instead of quietly throttling unrelated users.
+  const { key: rateKey, source: rateSource } = getClientIp(request, context);
+  const rate = checkRateLimit(rateKey, { limit, windowMs });
   if (!rate.allowed) {
-    log({ success: false, reason: 'rate_limited', requestId, ms: Date.now() - startedAt });
+    log({ success: false, reason: 'rate_limited', ipSource: rateSource, requestId, ms: Date.now() - startedAt });
     return new Response(JSON.stringify({ success: false, error: 'RATE_LIMITED' }), {
       status: 429,
       headers: {
