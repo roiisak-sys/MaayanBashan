@@ -75,6 +75,22 @@ export function isValidIsraeliId(value) {
 }
 
 /**
+ * Order-insensitive key for a person's name.
+ *
+ * People routinely enter "ידידים תמר" when the CRM holds "תמר ידידים", and
+ * either is a legitimate way to write their own name. Sorting the tokens makes
+ * both forms compare equal.
+ *
+ * This is safe here because the name is never the sole factor — the phone
+ * number must match the same record too — and an ambiguous match (more than
+ * one participant resolving to the same key) is still refused rather than
+ * guessed.
+ */
+export function nameSortKey(value) {
+  return normalizeName(value).split(' ').filter(Boolean).sort().join(' ');
+}
+
+/**
  * Canonicalize an Israeli phone number for comparison.
  *
  * The stored data is not consistently formatted — the live table contains

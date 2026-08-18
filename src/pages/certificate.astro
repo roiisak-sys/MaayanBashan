@@ -1,5 +1,11 @@
 ---
 import '../styles/global.css';
+
+// Technical support for certificate retrieval (Roi Isak).
+const SUPPORT_PHONE = '0509841722';
+const SUPPORT_WA_MESSAGE =
+  'היי, אני בוגר/ת קורס שפת גוף יולי 2026 ואני מתקשה להפיק את תעודת הסיום באתר. אשמח לעזרה 🙏';
+const SUPPORT_WA_HREF = `https://wa.me/972509841722?text=${encodeURIComponent(SUPPORT_WA_MESSAGE)}`;
 ---
 <!doctype html>
 <html lang="he" dir="rtl">
@@ -80,7 +86,13 @@ import '../styles/global.css';
           <button type="submit" id="cert-submit">הפקת התעודה</button>
         </form>
 
-        <p class="cert-status" id="cert-error" role="alert" aria-live="assertive" hidden></p>
+        <div class="cert-status" id="cert-error" role="alert" aria-live="assertive" hidden>
+          <p id="cert-error-text"></p>
+          <a class="cert-support-inline" href={SUPPORT_WA_HREF} target="_blank" rel="noopener">
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38a9.85 9.85 0 0 0 4.74 1.21h.01c5.46 0 9.91-4.45 9.91-9.91C21.96 6.45 17.5 2 12.04 2Zm5.52 14.15c-.25.7-1.24 1.28-1.72 1.35-.44.07-.98.1-1.58-.1-.36-.11-.83-.26-1.42-.52-2.5-1.07-4.13-3.58-4.25-3.74-.13-.17-1.02-1.35-1.02-2.57 0-1.22.65-1.82.87-2.07.23-.25.5-.31.66-.31h.48c.15 0 .36-.06.56.43.21.5.71 1.73.77 1.85.06.12.1.26.02.43-.08.16-.12.26-.24.41-.12.14-.26.32-.37.43-.13.13-.26.26-.11.51.14.24.64 1.05 1.37 1.7.94.84 1.73 1.1 1.98 1.22.25.13.39.11.54-.06.14-.16.62-.72.78-.97.17-.24.33-.2.56-.12.22.09 1.44.69 1.69.81.25.12.42.18.48.28.06.1.06.6-.15 1.18Z"/></svg>
+            פנייה לתמיכה בוואטסאפ
+          </a>
+        </div>
 
         <div class="cert-success" id="cert-success" role="status" aria-live="polite" hidden>
           <div class="cert-success-icon" aria-hidden="true">🎓</div>
@@ -89,6 +101,12 @@ import '../styles/global.css';
           <a class="cert-download" id="cert-download" href="#" download>הורדת תעודת הסיום</a>
           <button type="button" class="cert-reset" id="cert-reset">הפקת תעודה נוספת</button>
         </div>
+
+        <p class="cert-help">
+          נתקלתם בבעיה?
+          <a href={SUPPORT_WA_HREF} target="_blank" rel="noopener">פנו לתמיכה בוואטסאפ</a>
+          ({SUPPORT_PHONE})
+        </p>
 
         <p class="cert-privacy">הפרטים משמשים לאימות זכאות בלבד ואינם נשמרים.</p>
       </div>
@@ -110,24 +128,32 @@ import '../styles/global.css';
           EMPTY: 'נא למלא את כל השדות.',
           INVALID_PHONE_FORMAT: 'מספר הטלפון שהוזן אינו תקין. אנא הזינו מספר בפורמט 050-9482733.',
           INVALID_ID_FORMAT: 'מספר תעודת הזהות שהוזן אינו תקין. אנא בדקו ונסו שוב.',
-          INVALID_DETAILS: 'לא הצלחנו לאמת את הפרטים שהוזנו. אנא בדקו את הפרטים ונסו שוב.',
+          INVALID_DETAILS: 'לא הצלחנו לאמת את הפרטים שהוזנו. יש להקפיד על שם מלא ומספר טלפון מדויקים, בדיוק כפי שנמסרו בהרשמה לקורס. אם הפרטים נכונים והבעיה נמשכת, אפשר לפנות לתמיכה.',
           RATE_LIMITED: 'בוצעו יותר מדי ניסיונות. אנא נסו שוב בעוד מספר דקות.',
           SERVICE_UNAVAILABLE: 'לא ניתן היה להשלים את הבדיקה כרגע. אנא נסו שוב מאוחר יותר.',
           PDF_FAILED: 'מצאנו את הפרטים שלך, אך אירעה תקלה בהפקת התעודה. אנא נסו שוב.',
           NETWORK: 'לא ניתן היה להשלים את הבדיקה כרגע. אנא נסו שוב מאוחר יותר.'
         };
 
+        // Offering support on a formatting complaint would be noise — the user
+        // can fix those themselves. It is shown when verification actually failed.
+        var SHOW_SUPPORT_FOR = { INVALID_DETAILS: 1, PDF_FAILED: 1, SERVICE_UNAVAILABLE: 1, NETWORK: 1 };
+
         var busy = false;
         var objectUrl = null;
 
-        function showError(message) {
-          errorEl.textContent = message;
+        var errorTextEl = document.getElementById('cert-error-text');
+        var supportInlineEl = errorEl.querySelector('.cert-support-inline');
+
+        function showError(code) {
+          errorTextEl.textContent = MESSAGES[code] || MESSAGES.INVALID_DETAILS;
+          supportInlineEl.hidden = !SHOW_SUPPORT_FOR[code];
           errorEl.hidden = false;
         }
 
         function clearError() {
           errorEl.hidden = true;
-          errorEl.textContent = '';
+          errorTextEl.textContent = '';
         }
 
         function setBusy(state, label) {
@@ -154,7 +180,7 @@ import '../styles/global.css';
           var idNumber = idEl.value.trim();
 
           if (!name || !phone || !idNumber) {
-            showError(MESSAGES.EMPTY);
+            showError('EMPTY');
             (!name ? nameEl : (!phone ? phoneEl : idEl)).focus();
             return;
           }
@@ -189,12 +215,12 @@ import '../styles/global.css';
                 .json()
                 .catch(function () { return {}; })
                 .then(function (data) {
-                  showError(MESSAGES[data.error] || MESSAGES.INVALID_DETAILS);
+                  showError(MESSAGES[data.error] ? data.error : 'INVALID_DETAILS');
                   setBusy(false);
                 });
             })
             .catch(function () {
-              showError(MESSAGES.NETWORK);
+              showError('NETWORK');
               setBusy(false);
             });
         });
@@ -371,7 +397,32 @@ import '../styles/global.css';
     color: var(--c-rose);
     background: rgba(232, 161, 177, 0.1);
     border: 1px solid rgba(232, 161, 177, 0.3);
+    text-align: start;
   }
+  .cert-status p { margin: 0; }
+
+  .cert-support-inline {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin-top: 0.85rem;
+    padding: 0.5rem 1rem;
+    border-radius: 999px;
+    background: #25d366;
+    color: #06210f;
+    font-size: 0.9rem;
+    font-weight: 700;
+    text-decoration: none;
+  }
+  .cert-support-inline svg { width: 1.05rem; height: 1.05rem; }
+  .cert-support-inline:focus-visible { outline: 3px solid var(--c-gold-soft); outline-offset: 2px; }
+
+  .cert-help {
+    margin: 1.75rem 0 0;
+    font-size: 0.9rem;
+    color: var(--c-ink-dim);
+  }
+  .cert-help a { color: var(--c-gold-soft); font-weight: 600; }
 
   .cert-success { text-align: center; }
   .cert-success-icon { font-size: 2.6rem; line-height: 1; margin-bottom: 0.5rem; }
@@ -412,7 +463,7 @@ import '../styles/global.css';
   .cert-reset:focus-visible { outline: 2px solid var(--c-gold-soft); outline-offset: 2px; border-radius: 6px; }
 
   .cert-privacy {
-    margin: 1.75rem 0 0;
+    margin: 0.75rem 0 0;
     font-size: 0.82rem;
     color: rgba(243, 239, 227, 0.45);
   }

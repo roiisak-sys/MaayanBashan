@@ -13,6 +13,7 @@ import { fileURLToPath } from 'node:url';
 
 import {
   normalizeName,
+  nameSortKey,
   normalizeId,
   isValidIsraeliId,
   isPlausibleIdNumber,
@@ -112,6 +113,19 @@ describe('name normalization', () => {
 
   test('does not merge genuinely different names', () => {
     assert.notEqual(normalizeName('מיכל בן-שאול'), normalizeName('מיכל בן שאול'));
+  });
+
+  test('name key ignores first/last order', () => {
+    assert.equal(nameSortKey('תמר ידידים'), nameSortKey('ידידים תמר'));
+    assert.equal(nameSortKey('Yaffa Adler'), nameSortKey('adler  YAFFA'));
+    assert.equal(nameSortKey('יעל סאקסטין יונה'), nameSortKey('יונה יעל סאקסטין'));
+  });
+
+  test('name key still separates different people', () => {
+    assert.notEqual(nameSortKey('תמר ידידים'), nameSortKey('תמר כהן'));
+    assert.notEqual(nameSortKey('מיכל גפן'), nameSortKey('מיכל גפני'));
+    // A subset of the tokens is not a match.
+    assert.notEqual(nameSortKey('חגית'), nameSortKey('חגית ברוך'));
   });
 });
 
@@ -383,6 +397,30 @@ describe('eligibility verification', () => {
     assert.equal(await findEligibleParticipant({ ...args, fetchImpl: fakeAirtable(COHORT) }), null);
     // Populated and matching does.
     assert.ok(await findEligibleParticipant({ ...args, fetchImpl: fakeAirtable(COHORT_WITH_IDS) }));
+  });
+
+  test('accepts the name with first and last swapped', async () => {
+    const result = await findEligibleParticipant({
+      name: 'ישראלי ישראל',
+      phone: '050-9482733',
+      idNumber: '012345678',
+      env: BASE_ENV,
+      fetchImpl: fakeAirtable(COHORT),
+    });
+    assert.ok(result, 'reversed word order must still verify');
+    // The certificate still shows the spelling Maayan has on record.
+    assert.equal(result.displayName, 'ישראל ישראלי');
+  });
+
+  test('a partial name is still refused', async () => {
+    const result = await findEligibleParticipant({
+      name: 'ישראל',
+      phone: '050-9482733',
+      idNumber: '012345678',
+      env: BASE_ENV,
+      fetchImpl: fakeAirtable(COHORT),
+    });
+    assert.equal(result, null);
   });
 
   test('rejects the right name with the WRONG phone', async () => {

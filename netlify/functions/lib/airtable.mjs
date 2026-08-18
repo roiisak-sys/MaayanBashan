@@ -4,7 +4,7 @@
 // beyond a boolean decision plus the canonical name to print on the
 // certificate.
 
-import { normalizeName, normalizeId, normalizePhone } from './text.mjs';
+import { normalizeName, nameSortKey, normalizeId, normalizePhone } from './text.mjs';
 
 /** Thrown when Airtable itself is unreachable/misconfigured, as opposed to a
  *  simple "no match" result. Lets the caller distinguish 503 from 401. */
@@ -113,7 +113,7 @@ export async function findEligibleParticipant({ name, phone, idNumber, env = pro
     offset = payload.offset;
   } while (offset);
 
-  const wantedName = normalizeName(name);
+  const wantedName = nameSortKey(name);
   const wantedPhone = normalizePhone(phone);
   const wantedId = normalizeId(idNumber);
   if (!wantedName || !wantedPhone || !wantedId) return null;
@@ -130,9 +130,12 @@ export async function findEligibleParticipant({ name, phone, idNumber, env = pro
   // Identity requires BOTH the name and the phone number to match. Name alone
   // is too weak here: several participants are recorded under a single first
   // name, which anyone could guess. The ID is then reconciled separately.
+  //
+  // Name comparison is order-insensitive, so "ידידים תמר" matches a record
+  // stored as "תמר ידידים" — people write their own name either way round.
   const matches = cohort.filter((record) => {
     const fields = record.fields ?? {};
-    if (normalizeName(fields[config.nameField]) !== wantedName) return false;
+    if (nameSortKey(fields[config.nameField]) !== wantedName) return false;
 
     // Either phone column may be the well-formed one, so a match on either is
     // accepted; both are canonicalized before comparison.
