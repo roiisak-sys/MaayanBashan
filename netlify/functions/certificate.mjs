@@ -16,7 +16,7 @@ import { fileURLToPath } from 'node:url';
 import { findEligibleParticipant, recordParticipantId, AirtableUnavailableError } from './lib/airtable.mjs';
 import { generateCertificate, buildFilename } from './lib/certificate.mjs';
 import { checkRateLimit, getClientIp } from './lib/rate-limit.mjs';
-import { isValidIsraeliId, normalizePhone } from './lib/text.mjs';
+import { isPlausibleIdNumber, isValidIsraeliId, normalizePhone } from './lib/text.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 
@@ -120,12 +120,18 @@ export default async (request, context) => {
     return jsonError('INVALID_PHONE_FORMAT', 400);
   }
 
-  // Reject malformed IDs before touching Airtable. Every real Israeli ID has a
-  // valid check digit, so this catches typos, keeps invalid data out of the
-  // CRM, and stops a wrong number being printed onto a certificate. It reveals
-  // nothing about who is enrolled, so a specific message is safe here.
-  if (!isValidIsraeliId(idNumber)) {
+  // Only a shape check by default. The ID does not authenticate anyone — the
+  // name and phone do — so the cost of wrongly refusing a real graduate far
+  // outweighs the cost of an unusual number reaching a certificate. Enforcing
+  // the Israeli check digit is opt-in via CERT_VALIDATE_ID_CHECKSUM.
+  if (!isPlausibleIdNumber(idNumber)) {
     log({ success: false, reason: 'invalid_id_format', requestId, ms: Date.now() - startedAt });
+    return jsonError('INVALID_ID_FORMAT', 400);
+  }
+
+  const checksumOk = isValidIsraeliId(idNumber);
+  if (!checksumOk && env.CERT_VALIDATE_ID_CHECKSUM === 'true') {
+    log({ success: false, reason: 'id_checksum_rejected', requestId, ms: Date.now() - startedAt });
     return jsonError('INVALID_ID_FORMAT', 400);
   }
 
@@ -181,7 +187,9 @@ export default async (request, context) => {
     return jsonError('PDF_FAILED', 500);
   }
 
-  log({ success: true, idRecorded, requestId, ms: Date.now() - startedAt });
+  // checksumOk is recorded (never the number itself) so an unusual entry is
+  // visible in the logs without it having blocked anyone.
+  log({ success: true, idRecorded, checksumOk, requestId, ms: Date.now() - startedAt });
 
   // buildFilename yields ASCII only, so this header cannot be injected into.
   const filename = buildFilename(participant.displayName);

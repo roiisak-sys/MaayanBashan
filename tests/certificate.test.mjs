@@ -13,6 +13,7 @@ import {
   normalizeName,
   normalizeId,
   isValidIsraeliId,
+  isPlausibleIdNumber,
   formatIdForDisplay,
   normalizePhone,
   toVisualOrder,
@@ -135,6 +136,36 @@ describe('Israeli ID normalization', () => {
   test('validates the check digit', () => {
     assert.equal(isValidIsraeliId('000000018'), true);
     assert.equal(isValidIsraeliId('123456789'), false);
+  });
+
+  test('REGRESSION: invisible bidi marks must not invalidate a real ID', () => {
+    // Pasting from WhatsApp / any RTL context can prepend an invisible mark.
+    // These were not stripped, so a genuine ID was rejected as malformed.
+    for (const wrapped of [
+      '‏000000018',           // RTL mark
+      '‎000000018',           // LTR mark
+      '⁦000000018⁩',     // bidi isolates
+      '﻿000000018',           // BOM / zero-width no-break space
+      '‫000000018‬',     // embedding
+    ]) {
+      assert.equal(normalizeId(wrapped), '000000018', `not stripped: ${JSON.stringify(wrapped)}`);
+      assert.equal(isPlausibleIdNumber(wrapped), true);
+      assert.equal(isValidIsraeliId(wrapped), true);
+    }
+  });
+
+  test('acceptance is permissive: the ID does not authenticate anyone', () => {
+    // A number that fails the Israeli check digit is still accepted for
+    // printing, because refusing a real graduate is the worse failure.
+    assert.equal(isPlausibleIdNumber('123456789'), true);
+    assert.equal(isValidIsraeliId('123456789'), false);
+  });
+
+  test('but obvious rubbish is still refused', () => {
+    assert.equal(isPlausibleIdNumber(''), false);
+    assert.equal(isPlausibleIdNumber('abc'), false);
+    assert.equal(isPlausibleIdNumber('12'), false);
+    assert.equal(isPlausibleIdNumber('12345678901234'), false);
   });
 });
 

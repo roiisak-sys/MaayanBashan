@@ -35,8 +35,25 @@ export function normalizeName(value) {
 export function normalizeId(value) {
   return String(value ?? '')
     .normalize('NFKC')
-    .replace(/[\s \-–—_.]/g, '')
+    // Invisible bidi controls ride along with anything pasted out of WhatsApp
+    // or an RTL document. The separator rule below does not remove them, and
+    // they would otherwise make a perfectly valid ID fail every check.
+    .replace(/[‎‏‪-‮⁦-⁩﻿]/g, '')
+    .replace(/[^0-9]/g, '')
     .trim();
+}
+
+/**
+ * Is this plausibly an identity number we can print on a certificate?
+ *
+ * Deliberately permissive. The ID does NOT authenticate anyone - the name and
+ * phone do that - it is only rendered onto the certificate. Refusing a genuine
+ * graduate because their number is unusual (foreign resident, passport used at
+ * registration, an older format) is a much worse outcome than an odd-looking
+ * value on a PDF.
+ */
+export function isPlausibleIdNumber(value) {
+  return /^[0-9]{4,10}$/.test(normalizeId(value));
 }
 
 /**
