@@ -18,6 +18,38 @@ const FIELD_PRODUCTS = 'fldy6DhZezw4gVZuq'; // מוצרים (linked records)
 const FIELD_AD_NAME = 'fldGf8fiZdBxhvvzG'; // AD_Name
 const FIELD_ADSET_NAME = 'fldONC5BO7X7CxPsU'; // AD_G_Name
 const FIELD_CAMPAIGN = 'fldMFNgQMUKiYYsEH'; // Campaign_name
+const FIELD_ASSIGNEE = 'fld2PKwdR07wokQaa'; // בטיפול של (חדש)
+
+// Sales reps, in rotation order. The old Elementor page (through Make) handed
+// every lead to the next rep in turn; the new page must not leave leads
+// unassigned. Override with SALES_REPS="name1,name2" in the Netlify env.
+const SALES_REPS = String(process.env.SALES_REPS || 'רוני מובשוביץ,קרן קציר')
+  .split(',').map((s) => s.trim()).filter(Boolean);
+
+// Round-robin without a store: look at who got the most recent lead and hand
+// this one to the next rep in the list. Any failure falls back to the first rep.
+async function nextSalesRep(token) {
+  if (SALES_REPS.length === 0) return '';
+  try {
+    const params = new URLSearchParams();
+    params.set('maxRecords', '1');
+    params.set('returnFieldsByFieldId', 'true');
+    params.append('fields[]', FIELD_ASSIGNEE);
+    params.append('sort[0][field]', 'Created');
+    params.append('sort[0][direction]', 'desc');
+    params.set('filterByFormula', `{בטיפול של (חדש)} != ''`);
+    const r = await fetch(`https://api.airtable.com/v0/${BASE_ID}/${LEADS_TABLE_ID}?${params}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!r.ok) return SALES_REPS[0];
+    const data = await r.json();
+    const last = data.records?.[0]?.fields?.[FIELD_ASSIGNEE] || '';
+    const idx = SALES_REPS.indexOf(last);
+    return SALES_REPS[(idx + 1) % SALES_REPS.length];
+  } catch {
+    return SALES_REPS[0];
+  }
+}
 
 // The payment page comes from the Tal Bashan admin engine, so every division
 // bills through one Cardcom terminal and every purchase is recorded in the
@@ -127,6 +159,8 @@ export default async (request) => {
     }
   }
 
+  const assignee = await nextSalesRep(token);
+
   const airtableResponse = await fetch(
     `https://api.airtable.com/v0/${BASE_ID}/${LEADS_TABLE_ID}`,
     {
@@ -146,6 +180,7 @@ export default async (request) => {
               [FIELD_SOURCE]: 'דף נחיתה - קורס שפת גוף',
               [FIELD_PLATFORM]: utmSource || 'Website',
               [FIELD_PRODUCTS]: [courseRecordId],
+              ...(assignee ? { [FIELD_ASSIGNEE]: assignee } : {}),
               ...(utmContent ? { [FIELD_AD_NAME]: utmContent } : {}),
               ...(utmMedium ? { [FIELD_ADSET_NAME]: utmMedium } : {}),
               ...(utmCampaign ? { [FIELD_CAMPAIGN]: utmCampaign } : {}),
