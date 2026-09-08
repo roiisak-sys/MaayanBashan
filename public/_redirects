@@ -1,0 +1,5 @@
+# Checkout and thank-you page on our own domain. The page itself is served by
+# the Tal Bashan admin engine (one Cardcom terminal for both divisions); Netlify
+# proxies it here so the link the lead gets is maayanbashan.co.il/pay/<token>.
+/pay/*      https://admin.talbashan.co.il/pay/:splat      200
+/pay-done   https://admin.talbashan.co.il/pay-done        200
