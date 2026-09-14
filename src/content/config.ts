@@ -59,6 +59,8 @@ const courses = defineCollection({
     contactLink: z.string(),
     image: z.string().optional(),
     featured: z.boolean().default(false),
+    // Drives the order on /courses: the soonest upcoming course comes first.
+    startDate: z.coerce.date().optional(),
   }),
 });
 

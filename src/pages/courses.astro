@@ -2,7 +2,20 @@
 import BaseLayout from '../layouts/BaseLayout.astro';
 import { getCollection, render } from 'astro:content';
 
-const courses = await getCollection('courses');
+// Soonest upcoming course first. Courses that have already started drop below
+// the upcoming ones (most recent first), and courses with no start date go last.
+// "Now" is evaluated at build time; the site rebuilds on every CMS publish.
+const now = Date.now();
+const rank = (c: { data: { startDate?: Date } }) => {
+  const start = c.data.startDate?.valueOf();
+  if (start === undefined) return [2, 0];
+  return start >= now ? [0, start] : [1, -start];
+};
+const courses = (await getCollection('courses')).sort((a, b) => {
+  const [ga, ka] = rank(a);
+  const [gb, kb] = rank(b);
+  return ga - gb || ka - kb;
+});
 const renderedCourses = await Promise.all(
   courses.map(async (course) => ({ course, Content: (await render(course)).Content }))
 );
