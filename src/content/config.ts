@@ -42,6 +42,8 @@ const media = defineCollection({
   schema: z.object({
     title: z.string(),
     category: z.enum(['tv', 'podcast', 'article', 'other']),
+    // Broadcaster, used to order the TV section by channel.
+    outlet: z.enum(['keshet', 'kan', 'i24', 'ynet', 'other']).optional(),
     date: z.coerce.date(),
     url: z.string(),
     image: z.string().optional(),

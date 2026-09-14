@@ -50,6 +50,17 @@ collections:
           - {label: "טלוויזיה", value: "tv"}
           - {label: "עיתונות", value: "article"}
           - {label: "אירוח בפודקאסטים", value: "other"}
+      - label: "ערוץ"
+        name: "outlet"
+        widget: "select"
+        required: false
+        hint: "רלוונטי לקטגוריית טלוויזיה - קובע את הסדר בדף: קשת 12, כאן 11, i24, ynet, ואחר כך השאר"
+        options:
+          - {label: "קשת 12", value: "keshet"}
+          - {label: "כאן 11", value: "kan"}
+          - {label: "i24NEWS", value: "i24"}
+          - {label: "ynet", value: "ynet"}
+          - {label: "אחר", value: "other"}
       - {label: "תאריך", name: "date", widget: "datetime"}
       - {label: "קישור חיצוני", name: "url", widget: "string"}
       - {label: "תמונה", name: "image", widget: "image", required: false, hint: "לא חובה כשהקישור הוא סרטון יוטיוב - במקרה כזה תמונה ממוזערת נמשכת אוטומטית מהסרטון"}

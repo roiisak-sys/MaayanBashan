@@ -18,6 +18,15 @@ function cardImage(item: (typeof mediaItems)[number]): string | null {
   return item.data.image ?? youtubeThumbnail(item.data.url);
 }
 
+// TV appearances are grouped by channel in this order; within a channel the
+// newest comes first (mediaItems is already date-sorted, and sort is stable).
+// Items with no outlet set go last.
+const OUTLET_ORDER = ['keshet', 'kan', 'i24', 'ynet', 'other'];
+const outletRank = (item: (typeof mediaItems)[number]) => {
+  const rank = OUTLET_ORDER.indexOf(item.data.outlet ?? 'other');
+  return rank === -1 ? OUTLET_ORDER.length : rank;
+};
+
 const sections = [
   {
     key: 'podcast',
@@ -27,7 +36,9 @@ const sections = [
   {
     key: 'tv',
     title: 'טלוויזיה',
-    items: mediaItems.filter((i) => i.data.category === 'tv'),
+    items: mediaItems
+      .filter((i) => i.data.category === 'tv')
+      .sort((a, b) => outletRank(a) - outletRank(b)),
   },
   {
     key: 'article',
