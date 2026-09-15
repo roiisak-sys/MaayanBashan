@@ -17,7 +17,11 @@ export class AirtableUnavailableError extends Error {
 
 export function getAirtableConfig(env = process.env) {
   const config = {
-    token: env.AIRTABLE_PAT || env.AIRTABLE_TOKEN,
+    // Since 16.09.2026 the cohort lives in the unified Tal Bashan CRM. The admin
+    // engine serves it in the same Airtable record shape (same field ids below),
+    // so the matching logic is unchanged. Auth: the engine's internal key.
+    apiBase: env.CERT_API_BASE || `${env.ADMIN_BASE_URL || 'https://admin.talbashan.co.il'}/api/internal/cohort-records`,
+    token: env.ADMIN_INTERNAL_KEY || env.AIRTABLE_PAT || env.AIRTABLE_TOKEN,
     baseId: env.AIRTABLE_BASE_ID || 'appiziy69WzC5SqDK',
     tableId: env.AIRTABLE_TABLE_NAME || 'tbl3s3NLLL75Siqg3',
 
@@ -93,12 +97,14 @@ export async function findEligibleParticipant({ name, phone, idNumber, env = pro
 
   do {
     if (offset) params.set('offset', offset);
-    const url = `https://api.airtable.com/v0/${config.baseId}/${config.tableId}?${params.toString()}`;
+    params.set('cycle', config.targetCourseRecordId);
+    params.set('tenant', 'maayan');
+    const url = `${config.apiBase}?${params.toString()}`;
 
     let response;
     try {
       response = await fetchImpl(url, {
-        headers: { Authorization: `Bearer ${config.token}` },
+        headers: { Authorization: `Bearer ${config.token}`, 'x-internal-key': config.token },
       });
     } catch (cause) {
       throw new AirtableUnavailableError(`Airtable request failed: ${cause.message}`);
@@ -185,12 +191,13 @@ export async function findEligibleParticipant({ name, phone, idNumber, env = pro
  */
 export async function recordParticipantId({ recordId, idNumber, env = process.env, fetchImpl = fetch }) {
   const config = getAirtableConfig(env);
-  const url = `https://api.airtable.com/v0/${config.baseId}/${config.tableId}/${recordId}`;
+  const url = `${config.apiBase}/${recordId}`;
 
   const response = await fetchImpl(url, {
     method: 'PATCH',
     headers: {
       Authorization: `Bearer ${config.token}`,
+      'x-internal-key': config.token,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({ fields: { [config.idField]: normalizeId(idNumber) } }),

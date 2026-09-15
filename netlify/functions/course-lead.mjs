@@ -1,7 +1,9 @@
 // Receives course registrations from the landing page and hands them to the
-// Tal Bashan admin engine, which is the single writer into the Maayan Bashan
-// CRM (Airtable). The engine creates the lead with its campaign attribution
-// and returns the branded /pay page in the same call.
+// Tal Bashan admin engine, which is the single writer into the unified CRM
+// (Tal Bashan base, Maayan's division since 16.09.2026). The engine creates the
+// lead with its campaign attribution and returns the branded /pay page in the
+// same call. The fallback below still writes to the old Maayan base; an hourly
+// sync moves anything that lands there into the unified base.
 //
 // Why the engine and not a direct Airtable write: two writers on one table is
 // what produced duplicate leads (the engine's own "does this lead exist"
@@ -66,7 +68,8 @@ async function engineLead({ name, phone, email, courseRecordId, utm }) {
         email,
         amount: COURSE_PRICE,
         description: COURSE_TITLE,
-        productId: courseRecordId,
+        // the engine maps an old Maayan course id to its cycle in the unified base
+        cycleId: courseRecordId,
         source: SOURCE_LABEL,
         // Ad attribution travels with the lead: the engine writes it to the
         // same four fields the reports already read.

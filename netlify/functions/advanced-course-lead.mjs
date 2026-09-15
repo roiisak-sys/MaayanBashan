@@ -1,34 +1,87 @@
-// Receives registrations from the advanced course landing page and creates
-// a lead in the Maayan Bashan CRM (Airtable), linked to that course cohort.
+// Receives registrations from the advanced course landing page and hands them
+// to the Tal Bashan admin engine, which writes the lead into the unified CRM
+// (Tal Bashan base, Maayan's division since 16.09.2026): contact + opportunity
+// on the advanced course cycle, with campaign attribution, deduped live.
 //
-// Requires the AIRTABLE_TOKEN environment variable (Personal Access Token
-// with data.records:write scope on the CRM base). Set via:
-//   netlify env:set AIRTABLE_TOKEN <token>
+// If the engine is unreachable the lead is written to the old Maayan base as a
+// last resort, so it is never lost; an hourly sync moves it into the unified base.
+//
+// Env: none required for the normal path. AIRTABLE_TOKEN for the fallback only.
 
-const BASE_ID = 'appiziy69WzC5SqDK'; // Maayan Bashan CRM
-const LEADS_TABLE_ID = 'tbl3s3NLLL75Siqg3'; // לידים פרטי
+const ADMIN_BASE_URL = process.env.ADMIN_BASE_URL || 'https://admin.talbashan.co.il';
+const SOURCE_LABEL = 'דף נחיתה - קורס שפת גוף מתקדמים';
 
-const FIELD_NAME = 'fldtIhXNTeKPPs41O'; // שם
-const FIELD_STATUS = 'fld9Smx5O2HTn4zus'; // סטטוס
-const FIELD_PHONE = 'fldIaXr31RLDOZgUh'; // Phone
-const FIELD_EMAIL = 'fldCawUjSTnaDDO9j'; // Email
-const FIELD_SOURCE = 'fldfCp8fztIeriZDZ'; // מקור הגעה
-const FIELD_PLATFORM = 'fld8h8I2b5TaaPEKA'; // Platform
-const FIELD_PRODUCTS = 'fldy6DhZezw4gVZuq'; // מוצרים (linked records)
-
-// קורס שפת גוף מתקדמים ינואר 2027 — for the next cohort, override with the
-// ADVANCED_COURSE_RECORD_ID environment variable instead of editing this file.
+// קורס שפת גוף מתקדמים ינואר 2027 (old Maayan course id; the engine resolves it
+// to the cycle in the unified base). Override with ADVANCED_COURSE_RECORD_ID.
 const DEFAULT_COURSE_RECORD_ID = 'recqLb5JoZHMR2peH';
+
+const OLD_BASE_ID = 'appiziy69WzC5SqDK';
+const OLD_LEADS_TABLE_ID = 'tbl3s3NLLL75Siqg3';
+
+async function engineLead({ name, phone, email, courseRecordId, utm }) {
+  try {
+    const response = await fetch(`${ADMIN_BASE_URL}/public/landing-lead`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        tenant: 'maayan',
+        name,
+        phone,
+        email,
+        cycleId: courseRecordId,
+        source: SOURCE_LABEL,
+        utm_source: utm.source,
+        utm_medium: utm.medium,
+        utm_campaign: utm.campaign,
+        utm_content: utm.content,
+      }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || !data.ok) {
+      console.error('landing-lead failed', response.status, JSON.stringify(data));
+      return false;
+    }
+    return true;
+  } catch (error) {
+    console.error('landing-lead unreachable', error.message);
+    return false;
+  }
+}
+
+async function oldBaseFallback({ name, phone, email, courseRecordId }) {
+  const token = process.env.AIRTABLE_TOKEN;
+  if (!token) {
+    console.error('AIRTABLE_TOKEN is not configured - the lead could not be saved anywhere');
+    return false;
+  }
+  const response = await fetch(`https://api.airtable.com/v0/${OLD_BASE_ID}/${OLD_LEADS_TABLE_ID}`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      records: [{
+        fields: {
+          fldtIhXNTeKPPs41O: name,
+          fld9Smx5O2HTn4zus: 'חדש',
+          fldIaXr31RLDOZgUh: phone,
+          fldCawUjSTnaDDO9j: email,
+          fldfCp8fztIeriZDZ: SOURCE_LABEL,
+          fld8h8I2b5TaaPEKA: 'Website',
+          fldy6DhZezw4gVZuq: [courseRecordId],
+        },
+      }],
+      typecast: true,
+    }),
+  });
+  if (!response.ok) {
+    console.error('fallback Airtable create failed', response.status, await response.text());
+    return false;
+  }
+  return true;
+}
 
 export default async (request) => {
   if (request.method !== 'POST') {
     return new Response('Method Not Allowed', { status: 405 });
-  }
-
-  const token = process.env.AIRTABLE_TOKEN;
-  if (!token) {
-    console.error('AIRTABLE_TOKEN is not configured');
-    return Response.json({ ok: false, error: 'not configured' }, { status: 500 });
   }
 
   let payload;
@@ -45,64 +98,21 @@ export default async (request) => {
     return Response.json({ ok: false, error: 'missing name or phone' }, { status: 400 });
   }
 
+  const read = (key) => String(payload[key] ?? '').trim().slice(0, 250);
+  const utm = {
+    source: read('utm_source'),
+    medium: read('utm_medium'),
+    campaign: read('utm_campaign'),
+    content: read('utm_content'),
+  };
   const courseRecordId = process.env.ADVANCED_COURSE_RECORD_ID || DEFAULT_COURSE_RECORD_ID;
 
-  // Dedupe guard: if this phone number already submitted in the last 10
-  // minutes (double-click, double-tap, or a retried request), don't create
-  // a second lead — just acknowledge success.
-  const normalizedPhone = phone.replace(/\D/g, '');
-  if (normalizedPhone) {
-    const dedupeFormula = `AND(REGEX_REPLACE({Phone}, "[^0-9]", "") = "${normalizedPhone}", DATETIME_DIFF(NOW(), CREATED_TIME(), "minutes") < 10)`;
-    const dedupeUrl = `https://api.airtable.com/v0/${BASE_ID}/${LEADS_TABLE_ID}?maxRecords=1&filterByFormula=${encodeURIComponent(dedupeFormula)}`;
-    const dedupeResponse = await fetch(dedupeUrl, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    if (dedupeResponse.ok) {
-      const dedupeData = await dedupeResponse.json();
-      if (dedupeData.records?.length > 0) {
-        return Response.json({ ok: true, duplicate: true });
-      }
-    } else {
-      console.error('Airtable dedupe check failed', dedupeResponse.status, await dedupeResponse.text());
-      // Fall through and create the lead — a failed dedupe check should
-      // never block a genuine registration.
-    }
+  if (await engineLead({ name, phone, email, courseRecordId, utm })) {
+    return Response.json({ ok: true });
   }
-
-  const airtableResponse = await fetch(
-    `https://api.airtable.com/v0/${BASE_ID}/${LEADS_TABLE_ID}`,
-    {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        records: [
-          {
-            fields: {
-              [FIELD_NAME]: name,
-              [FIELD_STATUS]: 'חדש',
-              [FIELD_PHONE]: phone,
-              [FIELD_EMAIL]: email,
-              [FIELD_SOURCE]: 'דף נחיתה - קורס שפת גוף מתקדמים',
-              [FIELD_PLATFORM]: 'Website',
-              [FIELD_PRODUCTS]: [courseRecordId],
-            },
-          },
-        ],
-        typecast: true,
-      }),
-    }
-  );
-
-  if (!airtableResponse.ok) {
-    const detail = await airtableResponse.text();
-    console.error('Airtable create failed', airtableResponse.status, detail);
-    return Response.json({ ok: false, error: 'airtable error' }, { status: 502 });
-  }
-
-  return Response.json({ ok: true });
+  const saved = await oldBaseFallback({ name, phone, email, courseRecordId });
+  if (!saved) return Response.json({ ok: false, error: 'lead not saved' }, { status: 502 });
+  return Response.json({ ok: true, degraded: true });
 };
 
 export const config = { path: '/api/advanced-course-lead' };
