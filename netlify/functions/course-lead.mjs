@@ -2,8 +2,7 @@
 // Tal Bashan admin engine, which is the single writer into the unified CRM
 // (Tal Bashan base, Maayan's division since 16.09.2026). The engine creates the
 // lead with its campaign attribution and returns the branded /pay page in the
-// same call. The fallback below still writes to the old Maayan base; an hourly
-// sync moves anything that lands there into the unified base.
+// same call.
 //
 // Why the engine and not a direct Airtable write: two writers on one table is
 // what produced duplicate leads (the engine's own "does this lead exist"
@@ -11,25 +10,13 @@
 // earlier was invisible to it). One writer, and the duplicate class is gone.
 //
 // A lead is never lost: if the engine is unreachable, this function falls
-// back to writing the lead straight to Airtable and to the direct Cardcom
-// link, exactly as it did before.
+// back to writing the lead straight into the unified base, in the same shape
+// the engine writes it (lib/unified-lead.mjs), and to the direct Cardcom link.
 //
 // Env: ADMIN_INTERNAL_KEY (the engine's INTERNAL_API_KEY) for the normal
 // path, AIRTABLE_TOKEN for the fallback path only.
 
-const BASE_ID = 'appiziy69WzC5SqDK'; // Maayan Bashan CRM
-const LEADS_TABLE_ID = 'tbl3s3NLLL75Siqg3'; // לידים פרטי
-
-const FIELD_NAME = 'fldtIhXNTeKPPs41O'; // שם
-const FIELD_STATUS = 'fld9Smx5O2HTn4zus'; // סטטוס
-const FIELD_PHONE = 'fldIaXr31RLDOZgUh'; // Phone
-const FIELD_EMAIL = 'fldCawUjSTnaDDO9j'; // Email
-const FIELD_SOURCE = 'fldfCp8fztIeriZDZ'; // מקור הגעה
-const FIELD_PLATFORM = 'fld8h8I2b5TaaPEKA'; // Platform
-const FIELD_PRODUCTS = 'fldy6DhZezw4gVZuq'; // מוצרים (linked records)
-const FIELD_AD_NAME = 'fldGf8fiZdBxhvvzG'; // AD_Name
-const FIELD_ADSET_NAME = 'fldONC5BO7X7CxPsU'; // AD_G_Name
-const FIELD_CAMPAIGN = 'fldMFNgQMUKiYYsEH'; // Campaign_name
+import { unifiedFallbackLead } from './lib/unified-lead.mjs';
 
 // No rep is stamped on a new lead any more. A lead arrives unassigned and
 // sticks to the first rep who acts on it, which is how the Tal side works.
@@ -91,59 +78,6 @@ async function engineLead({ name, phone, email, courseRecordId, utm }) {
   }
 }
 
-// Fallback only. Runs when the engine did not answer, so that a registration
-// is never lost. Keeps the ten minute dedupe guard against double taps.
-async function airtableFallbackLead({ name, phone, email, courseRecordId, utm }) {
-  const token = process.env.AIRTABLE_TOKEN;
-  if (!token) {
-    console.error('AIRTABLE_TOKEN is not configured - the lead could not be saved anywhere');
-    return false;
-  }
-  const normalizedPhone = phone.replace(/\D/g, '');
-  if (normalizedPhone) {
-    try {
-      const formula = `AND(REGEX_REPLACE({Phone}, "[^0-9]", "") = "${normalizedPhone}", DATETIME_DIFF(NOW(), CREATED_TIME(), "minutes") < 10)`;
-      const url = `https://api.airtable.com/v0/${BASE_ID}/${LEADS_TABLE_ID}?maxRecords=1&filterByFormula=${encodeURIComponent(formula)}`;
-      const r = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
-      if (r.ok) {
-        const d = await r.json();
-        if (d.records?.length > 0) return true; // already saved a moment ago
-      }
-    } catch (error) {
-      console.error('fallback dedupe check failed', error.message);
-      // fall through: a failed check must not block a genuine registration
-    }
-  }
-  const response = await fetch(`https://api.airtable.com/v0/${BASE_ID}/${LEADS_TABLE_ID}`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      records: [
-        {
-          fields: {
-            [FIELD_NAME]: name,
-            [FIELD_STATUS]: 'חדש',
-            [FIELD_PHONE]: phone,
-            [FIELD_EMAIL]: email,
-            [FIELD_SOURCE]: SOURCE_LABEL,
-            [FIELD_PLATFORM]: utm.source || 'Website',
-            [FIELD_PRODUCTS]: [courseRecordId],
-            ...(utm.content ? { [FIELD_AD_NAME]: utm.content } : {}),
-            ...(utm.medium ? { [FIELD_ADSET_NAME]: utm.medium } : {}),
-            ...(utm.campaign ? { [FIELD_CAMPAIGN]: utm.campaign } : {}),
-          },
-        },
-      ],
-      typecast: true,
-    }),
-  });
-  if (!response.ok) {
-    console.error('fallback Airtable create failed', response.status, await response.text());
-    return false;
-  }
-  return true;
-}
-
 export default async (request) => {
   if (request.method !== 'POST') {
     return new Response('Method Not Allowed', { status: 405 });
@@ -178,7 +112,7 @@ export default async (request) => {
   const payUrl = await engineLead({ name, phone, email, courseRecordId, utm });
   if (payUrl) return Response.json({ ok: true, payUrl });
 
-  const saved = await airtableFallbackLead({ name, phone, email, courseRecordId, utm });
+  const saved = await unifiedFallbackLead({ name, phone, email, courseRecordId, source: SOURCE_LABEL, utm });
   if (!saved) return Response.json({ ok: false, error: 'lead not saved' }, { status: 502 });
   return Response.json({ ok: true, payUrl: FALLBACK_PAYMENT_URL, degraded: true });
 };
