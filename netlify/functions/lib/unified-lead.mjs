@@ -22,6 +22,7 @@ const CONTACT = {
   phone: 'fldBWWx7DKXRHn2tV',
   email: 'fld2FX4Jcyiq1MM0r',
   source: 'fldVPfBcAntmzMSr7',
+  status: 'fld2nOHrkIrAVb61T',
   company: 'fldXThxMzYCsZ2Sja',
 };
 const OPP = {
@@ -116,6 +117,7 @@ export async function unifiedFallbackLead({ name, phone, email, courseRecordId, 
         [CONTACT.phone]: toLocalPhone(phone),
         [CONTACT.company]: [MAAYAN_COMPANY_ID],
         [CONTACT.source]: source,
+        [CONTACT.status]: 'ליד',
       };
       if (parts.length) fields[CONTACT.firstName] = parts[0];
       if (parts.length > 1) fields[CONTACT.lastName] = parts.slice(1).join(' ');

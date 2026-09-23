@@ -64,6 +64,7 @@ describe('unifiedFallbackLead', () => {
     assert.equal(contact.fldmil8JbLf5XwkeQ, 'ישראלי כהן');
     assert.equal(contact.fldBWWx7DKXRHn2tV, '0501234567');
     assert.equal(contact.fld2FX4Jcyiq1MM0r, 'dana@example.com');
+    assert.equal(contact.fld2nOHrkIrAVb61T, 'ליד');
 
     const opp = calls.find((c) => c.method === 'POST' && c.table === OPPS).body.records[0].fields;
     assert.deepEqual(opp.fldzzQDcQ0W5OznYB, ['recNewContact0001']);
