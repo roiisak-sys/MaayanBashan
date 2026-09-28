@@ -125,6 +125,45 @@ const fullTitle = isHome ? title : `${title} | מעיין בשן - מומחית 
     </main>
     <Footer />
     <FloatingWhatsApp />
+    <script is:inline>
+      // Attribution that survives navigation: the latest tagged visit (ad
+      // UTMs or fbclid) is kept for 30 days on every page, so a visitor who
+      // lands on the home page or comes back later still carries the source.
+      // With no tags at all, the referrer decides, marked as organic.
+      (function () {
+        var KEY = 'mb_attr', MAX_AGE = 30 * 24 * 60 * 60 * 1000;
+        var p = new URLSearchParams(window.location.search);
+        var fields = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term'];
+        var tagged = {};
+        fields.forEach(function (k) { if (p.get(k)) tagged[k] = p.get(k); });
+        if (!tagged.utm_source && p.get('fbclid')) { tagged.utm_source = 'facebook'; tagged.utm_medium = 'paid'; }
+        function referrerSource() {
+          var r = '';
+          try { r = document.referrer ? new URL(document.referrer).hostname : ''; } catch (e) {}
+          if (!r || r === window.location.hostname) return 'direct';
+          if (/instagram/.test(r)) return 'instagram';
+          if (/facebook|fb\.com|m\.me/.test(r)) return 'facebook';
+          if (/whatsapp|wa\.me/.test(r)) return 'whatsapp';
+          if (/google/.test(r)) return 'google';
+          return r;
+        }
+        var stored = null;
+        try { stored = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) {}
+        if (stored && Date.now() - (stored.at || 0) > MAX_AGE) stored = null;
+        try {
+          if (tagged.utm_source) localStorage.setItem(KEY, JSON.stringify({ utm: tagged, at: Date.now() }));
+          else if (!stored) localStorage.setItem(KEY, JSON.stringify({ utm: { utm_source: referrerSource(), utm_medium: 'organic' }, at: Date.now() }));
+        } catch (e) {}
+        window.mbAttribution = function () {
+          if (tagged.utm_source) return tagged;
+          try {
+            var s = JSON.parse(localStorage.getItem(KEY) || 'null');
+            if (s && s.utm) return s.utm;
+          } catch (e) {}
+          return { utm_source: referrerSource(), utm_medium: 'organic' };
+        };
+      })();
+    </script>
     <script is:inline src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
     <script is:inline>
       if (window.netlifyIdentity) {

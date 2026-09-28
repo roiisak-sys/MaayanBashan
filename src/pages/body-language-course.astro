@@ -413,14 +413,9 @@ const faqs = [
           body: encode,
         }).then((r) => r.ok);
 
-        // Ad attribution: whatever the ad put in the URL travels with the
-        // lead, so the CRM knows which campaign and which ad produced it.
-        const params = new URLSearchParams(window.location.search);
-        const utm = {};
-        ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term'].forEach((key) => {
-          const value = params.get(key);
-          if (value) utm[key] = value;
-        });
+        // Attribution from the layout: this visit's ad tags, or the last
+        // tagged visit, or the referrer marked as organic. Never empty.
+        const utm = window.mbAttribution ? window.mbAttribution() : {};
 
         const crm = fetch('/api/course-lead', {
           method: 'POST',

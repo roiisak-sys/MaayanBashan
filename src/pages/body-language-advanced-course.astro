@@ -462,6 +462,7 @@ const faqs = [
           body: encode,
         }).then((r) => r.ok);
 
+        const utm = window.mbAttribution ? window.mbAttribution() : {};
         const crm = fetch('/api/advanced-course-lead', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -469,6 +470,7 @@ const faqs = [
             name: formData.get('name'),
             email: formData.get('email'),
             phone: formData.get('phone'),
+            ...utm,
           }),
         }).then((r) => r.ok).catch(() => false);
 
