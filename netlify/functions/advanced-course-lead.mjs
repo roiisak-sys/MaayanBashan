@@ -34,6 +34,10 @@ async function engineLead({ name, phone, email, courseRecordId, utm }) {
         utm_medium: utm.medium,
         utm_campaign: utm.campaign,
         utm_content: utm.content,
+        // Ad id and fbclid: the engine keeps them on the lead, so a lead can be
+        // traced to its ad even after the ad is renamed.
+        ad_id: utm.adId,
+        fbclid: utm.fbclid,
       }),
     });
     const data = await response.json().catch(() => ({}));
@@ -73,6 +77,8 @@ export default async (request) => {
     medium: read('utm_medium'),
     campaign: read('utm_campaign'),
     content: read('utm_content'),
+    adId: read('ad_id'),
+    fbclid: String(payload.fbclid ?? '').trim().slice(0, 300),
   };
   const courseRecordId = process.env.ADVANCED_COURSE_RECORD_ID || DEFAULT_COURSE_RECORD_ID;
 
