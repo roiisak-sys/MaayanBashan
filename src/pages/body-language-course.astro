@@ -198,7 +198,7 @@ const faqs = [
       <div class="lp-inner lp-story-grid">
         <div class="lp-story-photo">
           <span class="lp-photo-ring" aria-hidden="true"></span>
-          <img src="/images/maayan-about.png" alt="מעיין בשן" />
+          <img src="/images/maayan-story.jpg" alt="מעיין בשן" width="760" height="760" loading="lazy" />
         </div>
         <div class="lp-story-text">
           <div class="lp-eyebrow">הסיפור שמאחורי השיטה</div>
@@ -705,7 +705,11 @@ const faqs = [
     border: 1.5px dashed rgba(201, 160, 92, 0.4); border-radius: 50%;
   }
   .lp-story-photo img {
-    width: 100%; max-width: 320px; border-radius: 50%;
+    width: 100%; max-width: 320px; height: auto;
+    /* Pin the frame to a circle so the mask never depends on the source
+       image's own ratio — swapping the photo cannot turn it into an oval. */
+    aspect-ratio: 1; object-fit: cover;
+    border-radius: 50%;
     box-shadow: var(--lp-shadow-lg); position: relative;
   }
   .lp-story-text p { line-height: 1.85; color: var(--lp-ink-dim); margin: 0 0 1.1rem; }

@@ -1,0 +1,65 @@
+---
+import { getCollection } from 'astro:content';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+
+const guides = (await getCollection('guides')).sort(
+  (a, b) => a.data.order - b.data.order
+);
+---
+
+<BaseLayout
+  title="מדריכי שפת גוף"
+  description="מדריכים מעשיים בשפת גוף מאת מעיין בשן - מה כל מחווה באמת אומרת, איך קוראים אנשים נכון, ואילו קלישאות כדאי להפסיק להאמין להן."
+  keywords="מדריך שפת גוף, שפת גוף ידיים, איך לקרוא שפת גוף, שפת גוף הסבר, שפת גוף דוגמאות, מעיין בשן מדריכים"
+  bgVariant="mid"
+>
+  <section class="guides-page">
+    <header class="guides-head">
+      <span class="eyebrow">ללמוד לקרוא</span>
+      <h1>מדריכי <em class="marker">שפת גוף</em></h1>
+      <p>
+        מדריכים מעשיים, בלי קלישאות. כל מדריך עובר על המחוות הנפוצות ומראה מה הן
+        יכולות להעיד — ומה הן בוודאות לא מוכיחות.
+      </p>
+    </header>
+
+    <ul class="guides-list">
+      {guides.map((guide) => (
+        <li>
+          <a href={`/guides/${guide.id}/`}>
+            <h2>{guide.data.shortTitle}</h2>
+            <p>{guide.data.description}</p>
+            <span class="guides-more">למדריך המלא ←</span>
+          </a>
+        </li>
+      ))}
+    </ul>
+  </section>
+</BaseLayout>
+
+<style>
+  .guides-page { max-width: 860px; margin: 0 auto; padding: 3.5rem 1.5rem 5rem; }
+  .guides-head { margin-bottom: 2.8rem; }
+  .guides-head .eyebrow {
+    display: block; color: var(--gold-soft); font-weight: 800;
+    letter-spacing: 0.06em; font-size: 0.92rem; margin-bottom: 0.9rem;
+  }
+  .guides-head h1 {
+    font-size: clamp(2rem, 4.6vw, 2.9rem); margin: 0 0 1rem; color: var(--ink);
+  }
+  .guides-head p { color: var(--ink-dim); line-height: 1.85; margin: 0; max-width: 60ch; }
+
+  .guides-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 1.1rem; }
+  .guides-list a {
+    display: block; padding: 1.6rem 1.7rem;
+    border: 1px solid var(--border); border-radius: 14px;
+    background: var(--card); text-decoration: none;
+    transition: border-color 0.2s, transform 0.2s;
+  }
+  .guides-list a:hover { border-color: var(--gold); transform: translateY(-2px); }
+  .guides-list h2 { margin: 0 0 0.6rem; font-size: 1.35rem; color: var(--ink); }
+  .guides-list p { margin: 0 0 0.9rem; color: var(--ink-dim); line-height: 1.75; }
+  .guides-more { color: var(--gold); font-weight: 700; font-size: 0.95rem; }
+
+  @media (max-width: 600px) { .guides-page { padding: 2.5rem 1rem 4rem; } }
+</style>

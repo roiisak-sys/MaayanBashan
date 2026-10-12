@@ -1,0 +1,211 @@
+---
+import { getCollection, render } from 'astro:content';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+
+export async function getStaticPaths() {
+  const guides = await getCollection('guides');
+  return guides.map((guide) => ({ params: { slug: guide.id }, props: { guide } }));
+}
+
+const { guide } = Astro.props;
+const { Content } = await render(guide);
+const { title, shortTitle, description, keywords, summary, updated, faq } = guide.data;
+
+const url = `https://maayanbashan.co.il/guides/${guide.id}/`;
+const updatedISO = updated.toISOString().slice(0, 10);
+const updatedLabel = updated.toLocaleDateString('he-IL', {
+  year: 'numeric',
+  month: 'long',
+  day: 'numeric',
+});
+
+// Article + FAQPage + Breadcrumbs. The FAQ is the part most likely to be
+// lifted verbatim by an assistant, so it is both rendered and marked up.
+const schema = {
+  '@context': 'https://schema.org',
+  '@graph': [
+    {
+      '@type': 'Article',
+      '@id': `${url}#article`,
+      headline: title,
+      description,
+      inLanguage: 'he-IL',
+      datePublished: updatedISO,
+      dateModified: updatedISO,
+      mainEntityOfPage: url,
+      author: { '@id': 'https://maayanbashan.co.il/#person' },
+      publisher: { '@id': 'https://maayanbashan.co.il/#person' },
+      about: 'שפת גוף',
+    },
+    ...(faq.length
+      ? [
+          {
+            '@type': 'FAQPage',
+            '@id': `${url}#faq`,
+            mainEntity: faq.map((item) => ({
+              '@type': 'Question',
+              name: item.q,
+              acceptedAnswer: { '@type': 'Answer', text: item.a },
+            })),
+          },
+        ]
+      : []),
+    {
+      '@type': 'BreadcrumbList',
+      itemListElement: [
+        { '@type': 'ListItem', position: 1, name: 'בית', item: 'https://maayanbashan.co.il/' },
+        { '@type': 'ListItem', position: 2, name: 'מדריכים', item: 'https://maayanbashan.co.il/guides/' },
+        { '@type': 'ListItem', position: 3, name: shortTitle, item: url },
+      ],
+    },
+  ],
+};
+---
+
+<BaseLayout title={title} description={description} keywords={keywords} bgVariant="mid">
+  <script type="application/ld+json" set:html={JSON.stringify(schema)} slot="head" />
+
+  <article class="guide">
+    <nav class="guide-crumbs" aria-label="מיקום בעמוד">
+      <a href="/">בית</a> <span aria-hidden="true">›</span>
+      <a href="/guides/">מדריכים</a> <span aria-hidden="true">›</span>
+      <span>{shortTitle}</span>
+    </nav>
+
+    <header class="guide-head">
+      <span class="eyebrow">מדריך שפת גוף</span>
+      <h1>{title}</h1>
+      <p class="guide-summary">{summary}</p>
+      <p class="guide-meta">
+        מאת <a href="/about/">מעיין בשן</a>, מומחית שפת גוף · עודכן
+        <time datetime={updatedISO}>{updatedLabel}</time>
+      </p>
+    </header>
+
+    <div class="guide-body">
+      <Content />
+    </div>
+
+    {faq.length > 0 && (
+      <section class="guide-faq">
+        {faq.map((item) => (
+          <details>
+            <summary>{item.q}</summary>
+            <p>{item.a}</p>
+          </details>
+        ))}
+      </section>
+    )}
+
+    <aside class="guide-cta">
+      <h2>לתרגל את זה באמת</h2>
+      <p>
+        קריאה של אנשים בזמן אמת נרכשת בתרגול מונחה, לא בקריאה. בקורס
+        "ניתוח גוף פתוח" מתרגלים מול שחקן, עם פידבק אישי בכל מפגש.
+      </p>
+      <a href="/body-language-course/" class="guide-cta-btn">לפרטי קורס שפת גוף ←</a>
+    </aside>
+  </article>
+</BaseLayout>
+
+<style>
+  .guide {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 3.5rem 1.5rem 5rem;
+  }
+
+  .guide-crumbs {
+    font-size: 0.88rem;
+    color: var(--ink-dim);
+    margin-bottom: 2rem;
+  }
+  .guide-crumbs a { color: var(--gold); text-decoration: none; }
+  .guide-crumbs a:hover { text-decoration: underline; }
+  .guide-crumbs span { opacity: 0.55; }
+
+  .guide-head { margin-bottom: 2.5rem; }
+  .guide-head .eyebrow {
+    display: block; color: var(--gold-soft);
+    font-weight: 800; letter-spacing: 0.06em;
+    font-size: 0.92rem; margin-bottom: 0.9rem;
+  }
+  .guide-head h1 {
+    font-size: clamp(1.9rem, 4.4vw, 2.7rem);
+    line-height: 1.25; margin: 0 0 1.2rem;
+    color: var(--ink);
+  }
+  .guide-summary {
+    font-size: 1.1rem; line-height: 1.8;
+    color: var(--ink);
+    border-inline-start: 3px solid var(--gold);
+    padding-inline-start: 1.1rem;
+    margin: 0 0 1.4rem;
+  }
+  .guide-meta { font-size: 0.9rem; color: var(--ink-dim); margin: 0; }
+  .guide-meta a { color: var(--gold); }
+
+  /* Long-form body. Styling the rendered markdown, hence the descendant
+     selectors rather than classes. */
+  .guide-body { font-size: 1.05rem; line-height: 1.9; color: var(--ink-dim); }
+  .guide-body :global(h2) {
+    font-size: clamp(1.4rem, 3vw, 1.75rem);
+    line-height: 1.35; color: var(--ink);
+    margin: 3rem 0 1rem;
+  }
+  .guide-body :global(h3) {
+    font-size: 1.18rem; color: var(--gold-soft);
+    margin: 2.2rem 0 0.7rem;
+  }
+  .guide-body :global(p) { margin: 0 0 1.15rem; }
+  .guide-body :global(strong) { color: var(--ink); font-weight: 700; }
+  .guide-body :global(ul),
+  .guide-body :global(ol) { margin: 0 0 1.3rem; padding-inline-start: 1.3rem; }
+  .guide-body :global(li) { margin-bottom: 0.65rem; }
+  .guide-body :global(a) { color: var(--gold); }
+  .guide-body :global(hr) {
+    border: 0; height: 1px; margin: 2.8rem 0;
+    background: var(--border);
+  }
+  .guide-body :global(blockquote) {
+    margin: 2rem 0; padding: 1.2rem 1.4rem;
+    background: var(--card);
+    border-inline-start: 3px solid var(--gold);
+    border-radius: 0 10px 10px 0;
+    color: var(--ink);
+  }
+  .guide-body :global(blockquote p:last-child) { margin-bottom: 0; }
+
+  .guide-faq { margin-top: 1rem; }
+  .guide-faq details {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 0.9rem 1.1rem;
+    margin-bottom: 0.7rem;
+    background: var(--card);
+  }
+  .guide-faq summary {
+    cursor: pointer; font-weight: 700; color: var(--ink);
+    line-height: 1.5;
+  }
+  .guide-faq details[open] summary { margin-bottom: 0.7rem; }
+  .guide-faq p { margin: 0; color: var(--ink-dim); line-height: 1.85; }
+
+  .guide-cta {
+    margin-top: 3.5rem; padding: 2rem;
+    border: 1px solid var(--border); border-radius: 14px;
+    background: var(--card); text-align: center;
+  }
+  .guide-cta h2 { margin: 0 0 0.7rem; font-size: 1.45rem; color: var(--ink); }
+  .guide-cta p { margin: 0 0 1.4rem; color: var(--ink-dim); line-height: 1.8; }
+  .guide-cta-btn {
+    display: inline-block; padding: 0.85rem 1.9rem;
+    background: var(--gold); color: #0a0e1c;
+    font-weight: 800; border-radius: 999px; text-decoration: none;
+  }
+  .guide-cta-btn:hover { background: var(--gold-soft); }
+
+  @media (max-width: 600px) {
+    .guide { padding: 2.5rem 1rem 4rem; }
+  }
+</style>

@@ -64,6 +64,24 @@ const courses = defineCollection({
   }),
 });
 
+// Long-form SEO/GEO guides. Each one targets a cluster of real search queries
+// and carries its own FAQ, which is rendered on the page and emitted as
+// FAQPage structured data.
+const guides = defineCollection({
+  loader: glob({ pattern: '**/*.md', base: './src/content/guides' }),
+  schema: z.object({
+    title: z.string(),
+    // Used in listings and breadcrumbs, where the full title is too long.
+    shortTitle: z.string(),
+    description: z.string(),
+    keywords: z.string(),
+    summary: z.string(),
+    updated: z.coerce.date(),
+    order: z.number().default(99),
+    faq: z.array(z.object({ q: z.string(), a: z.string() })).default([]),
+  }),
+});
+
 const testimonials = defineCollection({
   loader: glob({ pattern: '**/*.md', base: './src/content/testimonials' }),
   schema: z.object({
@@ -87,6 +105,7 @@ export const collections = {
   organizations,
   media,
   courses,
+  guides,
   testimonials,
   partner_logos: partnerLogos,
 };
