@@ -15,7 +15,7 @@ interface Props {
 const {
   title,
   description = 'מעיין בשן - מומחית שפת גוף, מרצה ופרשנית תקשורת לא מילולית. הרצאות, קורסים ופודקאסט "ניתוח גוף פתוח".',
-  keywords = 'מעיין בשן, מעין בשן, שפת גוף, שפתגוף, ניתוח גוף פתוח, מומחית שפת גוף, קריאת שפת גוף, זיהוי שקרים, חתונמי',
+  keywords = 'מעיין בשן, מעין בשן, מעיין בשן פולק, שפת גוף, שפתגוף, מומחית שפת גוף, מומחה שפת גוף, ניתוח גוף פתוח, קריאת שפת גוף, תקשורת לא מילולית, זיהוי שקרים, מיקרו הבעות',
   ogImage = '/images/maayan-hero.png',
   bgVariant = 'base',
 } = Astro.props;
@@ -67,12 +67,22 @@ import Attribution from '../components/Attribution.astro';
           '@type': 'Person',
           '@id': 'https://maayanbashan.co.il/#person',
           name: 'מעיין בשן',
-          alternateName: ['מעין בשן', 'Maayan Bashan', 'Maayan Bashan body language'],
+          alternateName: ['מעין בשן', 'מעיין בשן פולק', 'Maayan Bashan', 'Maayan Bashan body language'],
           jobTitle: 'מומחית שפת גוף ותקשורת בלתי-מילולית',
           description: 'מעיין בשן - מומחית שפת גוף, מרצה ופרשנית תקשורת לא מילולית, מנחת הפודקאסט "ניתוח גוף פתוח". למעלה מ-20 שנות ניסיון בתחום.',
           url: 'https://maayanbashan.co.il',
           image: ogImageURL.toString(),
           nationality: { '@type': 'Country', name: 'Israel' },
+          affiliation: {
+            '@type': 'CollegeOrUniversity',
+            name: 'אוניברסיטת אריאל',
+            sameAs: 'https://www.ariel.ac.il/',
+          },
+          hasOccupation: {
+            '@type': 'Occupation',
+            name: 'מרצה בחוג לפרופילאות פלילית, אוניברסיטת אריאל',
+            occupationLocation: { '@type': 'Country', name: 'Israel' },
+          },
           knowsLanguage: ['he', 'en'],
           email: 'maayan.inst@gmail.com',
           telephone: '+972-50-558-5177',
@@ -105,6 +115,20 @@ import Attribution from '../components/Attribution.astro';
             url: 'https://maayanbashan.co.il',
             areaServed: { '@type': 'Country', name: 'Israel' },
           },
+        },
+        {
+          '@type': 'PodcastSeries',
+          '@id': 'https://maayanbashan.co.il/#podcast',
+          name: 'ניתוח גוף פתוח',
+          alternateName: 'Open Body Analysis',
+          description: 'פודקאסט שפת גוף בעברית עם מעיין בשן והשחקן אמנון וולף — שיחות עם אורחים מוכרים על שפת הגוף שלהם.',
+          inLanguage: 'he-IL',
+          url: 'https://maayanbashan.co.il/media/',
+          author: { '@id': 'https://maayanbashan.co.il/#person' },
+          sameAs: [
+            'https://open.spotify.com/show/03Rq0mo36Cz92l8sHh5ltL',
+            'https://creators.spotify.com/pod/profile/maayan-bashan/',
+          ],
         },
         {
           '@type': 'WebSite',
