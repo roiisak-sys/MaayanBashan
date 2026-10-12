@@ -278,7 +278,7 @@ const faqs = [
           </div>
           <div class="lp-meta-item lp-meta-urgent">
             <span class="lp-urgency-dot" aria-hidden="true"></span>
-            <div><h4>מספר המקומות מוגבל</h4><p>הקבוצה נשמרת קטנה כדי לאפשר תרגול ופידבק אישי</p></div>
+            <div><h4>מספר המקומות מוגבל</h4><p>ההרשמה נסגרת עם מילוי המקומות</p></div>
           </div>
         </div>
       </div>
@@ -322,7 +322,7 @@ const faqs = [
         <div>
           <span class="lp-instant-tag">הרשמה</span>
           <h3>אפשר להשלים את ההרשמה והתשלום כאן ועכשיו</h3>
-          <p>ממלאים פרטים וממשיכים לתשלום מאובטח בכרטיס אשראי. הקבוצה מוגבלת בגודלה.</p>
+          <p>ממלאים פרטים וממשיכים לתשלום מאובטח בכרטיס אשראי.</p>
         </div>
         <a href="#register" class="lp-btn lp-btn-light">להרשמה ותשלום — 1,600 ₪ ←</a>
       </div>
@@ -904,7 +904,18 @@ const faqs = [
 
   /* ===== responsive ===== */
   @media (max-width: 860px) {
-    .lp-hero { flex-direction: column; text-align: center; padding: 3.5rem 1.5rem 3rem; }
+    .lp-hero { flex-direction: column; text-align: center; padding: 1.5rem 1.25rem 3rem; }
+    /* Phones: the registration button has to sit in the first screen, so it
+       moves up under the subtitle and the bullets follow it. */
+    /* As a flex item the empty decoration layer took a share of the 2.5rem
+       column gap and pushed the copy down by 40px. */
+    .lp-hero-shapes { position: absolute; inset: 0; }
+    .lp-hero-text { display: flex; flex-direction: column; }
+    .lp-eyebrow-pill { margin-bottom: 0.75rem; font-size: 0.95rem; }
+    .lp-hero h1 { margin-bottom: 0.85rem; }
+    .lp-hero-sub { font-size: 1.05rem; line-height: 1.65; margin-bottom: 1.25rem; }
+    .lp-cta-row { order: 1; margin-bottom: 1.75rem; gap: 1.25rem; }
+    .lp-bullets { order: 2; margin-bottom: 0; }
     .lp-bullets li { text-align: right; }
     .lp-cta-row { justify-content: center; }
     .lp-story-grid { grid-template-columns: 1fr; }
