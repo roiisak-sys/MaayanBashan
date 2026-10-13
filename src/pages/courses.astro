@@ -1,13 +1,18 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
 import { getCollection, render } from 'astro:content';
+import { sortSessions, cycleLabel } from '../lib/cycle';
 
 // Soonest upcoming course first. Courses that have already started drop below
 // the upcoming ones (most recent first), and courses with no start date go last.
 // "Now" is evaluated at build time; the site rebuilds on every CMS publish.
 const now = Date.now();
-const rank = (c: { data: { startDate?: Date } }) => {
-  const start = c.data.startDate?.valueOf();
+// A course that lists its sessions is ranked on the first of them, so the
+// ordering cannot drift from the schedule shown on the course page.
+const startOf = (c: { data: { startDate?: Date; sessions?: Date[] } }) =>
+  sortSessions(c.data.sessions ?? [])[0] ?? c.data.startDate;
+const rank = (c: { data: { startDate?: Date; sessions?: Date[] } }) => {
+  const start = startOf(c)?.valueOf();
   if (start === undefined) return [2, 0];
   return start >= now ? [0, start] : [1, -start];
 };
@@ -35,7 +40,7 @@ const renderedCourses = await Promise.all(
           {course.data.image && <img src={course.data.image} alt={course.data.title} />}
           <div class="course-body">
             <h2>{course.data.title}</h2>
-            <p class="format">{course.data.format}</p>
+            <p class="format">{[course.data.format, cycleLabel(course.data.sessions)].filter(Boolean).join(' · ')}</p>
             <div class="description"><Content /></div>
             <a class="btn btn-teal" href={course.data.contactLink}>ליצירת קשר להרשמה ←</a>
           </div>

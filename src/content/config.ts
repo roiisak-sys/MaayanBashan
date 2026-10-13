@@ -60,7 +60,12 @@ const courses = defineCollection({
     image: z.string().optional(),
     featured: z.boolean().default(false),
     // Drives the order on /courses: the soonest upcoming course comes first.
+    // `sessions[0]` takes precedence where a course lists its meetings.
     startDate: z.coerce.date().optional(),
+    // The cohort's meeting dates. Every date-dependent string on the course
+    // pages — cycle label, schedule tickets, schema startDate — is derived from
+    // these, so a new cohort only needs its dates changed. See src/lib/cycle.ts.
+    sessions: z.array(z.coerce.date()).default([]),
   }),
 });
 

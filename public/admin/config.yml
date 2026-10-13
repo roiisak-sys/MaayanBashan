@@ -78,6 +78,12 @@ collections:
       - {label: "תמונה", name: "image", widget: "image", required: false}
       - {label: "מוצג בדף הבית", name: "featured", widget: "boolean", default: false}
       - {label: "תאריך התחלה", name: "startDate", widget: "datetime", required: false, time_format: false, hint: "קובע את הסדר בדף הקורסים - הקורס שמתחיל הכי קרוב מופיע ראשון"}
+      - label: "מועדי מפגשים"
+        name: "sessions"
+        widget: "list"
+        required: false
+        hint: "כל התאריכים של המחזור. שם המחזור, לוח המפגשים וכל טקסט שתלוי בתאריך מתעדכנים לבד לפי מה שרשום כאן"
+        field: {label: "תאריך מפגש", name: "date", widget: "datetime", time_format: false}
   - name: "organizations"
     label: "ארגונים"
     files:

@@ -1,13 +1,23 @@
 ---
+import { getEntry } from 'astro:content';
 import Footer from '../components/Footer.astro';
 import FloatingWhatsApp from '../components/FloatingWhatsApp.astro';
 import MetaPixel from '../components/MetaPixel.astro';
 import Attribution from '../components/Attribution.astro';
+import { sortSessions, shortDate, shortDateWithYear, isoDate, cycleLabel } from '../lib/cycle';
 import '../styles/global.css';
 
 const PAYMENT_URL = 'https://secure.cardcom.solutions/EA/EA5/4SwsNP9VJ0ueOlqA9OOBzg/PaymentSP';
 
-const dates = ['23.10', '30.10', '13.11', '20.11', '27.11'];
+// The cohort's dates live in the CMS, not here. Everything below that mentions a
+// month or a date is derived from them, so the next cohort is a content edit.
+const course = await getEntry('courses', 'open-body-analysis-course');
+const sessions = sortSessions(course?.data.sessions ?? []);
+const firstSession = sessions[0];
+
+const dates = sessions.map(shortDate);
+const label = cycleLabel(sessions);
+const startsOn = firstSession ? shortDateWithYear(firstSession) : '';
 
 const outcomes = [
   {
@@ -76,7 +86,7 @@ const faqs = [
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>קורס שפת גוף - "ניתוח גוף פתוח" | מעיין בשן</title>
-    <meta name="description" content='הכשרה מקצועית בשפת גוף ובתקשורת בלתי-מילולית עם מעיין בשן (מעין בשן) — קורס "ניתוח גוף פתוח", 25 שעות, 5 מפגשי עומק, אוקטובר-נובמבר 2026, הרצליה' />
+    <meta name="description" content={`הכשרה מקצועית בשפת גוף ובתקשורת בלתי-מילולית עם מעיין בשן (מעין בשן) — קורס "ניתוח גוף פתוח", 25 שעות, 5 מפגשי עומק, ${label}, הרצליה`} />
     <meta name="keywords" content="קורס שפת גוף, לימודי שפת גוף, קורס שפת גוף מעיין בשן, קורס שפת גוף הרצליה, קורס שפת גוף תל אביב, לימודי תעודה שפת גוף, קורס זיהוי שקרים, קורס מיקרו הבעות, ניתוח גוף פתוח, מעיין בשן, מעין בשן, שפת גוף, תקשורת לא מילולית, קריאת שפת גוף" />
     <meta name="google-site-verification" content="eP1EVt4zfY7kOhKGsSnLYR49MPqn7bKNlRavQqKDkGo" />
     <link rel="canonical" href="https://maayanbashan.co.il/body-language-course/" />
@@ -138,7 +148,7 @@ const faqs = [
           '@type': 'CourseInstance',
           courseMode: 'Onsite',
           location: { '@type': 'Place', name: 'הרצליה' },
-          startDate: '2026-10-23',
+          ...(firstSession ? { startDate: isoDate(firstSession) } : {}),
         },
       },
       {
@@ -170,7 +180,7 @@ const faqs = [
         <span class="shape shape-tri"></span>
       </div>
       <div class="lp-hero-text">
-        <div class="lp-eyebrow-pill">✦ מחזור אוקטובר 2026 · הרצליה</div>
+        <div class="lp-eyebrow-pill">✦ מחזור {label} · הרצליה</div>
         <h1><span class="lp-h1-lead">קורס שפת גוף “ניתוח גוף פתוח”</span>לקרוא אנשים<br />כמו <em class="lp-marker">ספר פתוח</em></h1>
         <p class="lp-hero-sub">25 שעות הכשרה מעשית בשפת גוף ובתקשורת בלתי-מילולית עם מעיין בשן — חמישה מפגשי עומק, תרגול מונחה ופידבק אישי בכל מפגש.</p>
         <ul class="lp-bullets">
@@ -184,7 +194,7 @@ const faqs = [
           <div class="lp-price-tag">
             <span class="lp-price-old">3,000 ₪</span>
             <strong>1,600 ₪</strong>
-            <span>מתחילים 23.10.26 · הרצליה</span>
+            <span>מתחילים {startsOn} · הרצליה</span>
           </div>
         </div>
       </div>
@@ -284,7 +294,7 @@ const faqs = [
       <div class="lp-inner">
         <div class="lp-eyebrow">מתכונת הקורס</div>
         <h2>5 מפגשים × 5 שעות = <em class="lp-marker-soft">25 שעות הכשרה</em></h2>
-        <p class="lp-section-desc">ימי שישי בבוקר · 9:00–14:00 · הרצליה · אוקטובר–נובמבר 2026</p>
+        <p class="lp-section-desc">ימי שישי בבוקר · 9:00–14:00 · הרצליה · {label}</p>
         <div class="lp-tickets">
           {dates.map((d, i) => (
             <div class="lp-ticket">
@@ -411,7 +421,7 @@ const faqs = [
         <div class="lp-form-wrap">
           <div class="lp-eyebrow lp-center">הרשמה לקורס</div>
           <h2 class="lp-center">הצטרפו לקורס<br />ניתוח גוף פתוח</h2>
-          <p class="lp-center">25 שעות הכשרה מעשית ותעודת סיום. מחזור אוקטובר–נובמבר 2026, הרצליה.</p>
+          <p class="lp-center">25 שעות הכשרה מעשית ותעודת סיום. מחזור {label}, הרצליה.</p>
           <form name="course-registration" method="POST" data-netlify="true" netlify-honeypot="bot-field">
             <input type="hidden" name="form-name" value="course-registration" />
             <p class="lp-hidden-field"><label>אל תמלאו שדה זה: <input name="bot-field" /></label></p>
@@ -434,7 +444,7 @@ const faqs = [
     </section>
 
     <Footer />
-    <FloatingWhatsApp message="היי מעיין, אני מתעניין/ת בקורס 'ניתוח גוף פתוח' (אוקטובר-נובמבר 2026) ואשמח לפרטים נוספים" />
+    <FloatingWhatsApp message={`היי מעיין, אני מתעניין/ת בקורס 'ניתוח גוף פתוח' (${label}) ואשמח לפרטים נוספים`} />
 
     <script is:inline>
       const form = document.querySelector('form[name="course-registration"]');
