@@ -97,40 +97,67 @@ const faqs = [
     <meta property="og:site_name" content="מעיין בשן" />
     <meta name="twitter:card" content="summary_large_image" />
 
-    <!-- Structured data: Course -->
+    <!-- Structured data: Person + Course + FAQ -->
     <script type="application/ld+json" set:html={JSON.stringify({
       '@context': 'https://schema.org',
-      '@type': 'Course',
-      name: 'קורס ניתוח גוף פתוח',
-      description: 'הכשרה מקצועית בשפת גוף ובתקשורת בלתי-מילולית עם מעיין בשן - 25 שעות, 5 מפגשי עומק, תרגול מונחה ופידבק אישי. זיהוי חוסר אמת ומניפולציה, נוכחות והשפעה.',
-      provider: {
+      '@graph': [
+      {
         '@type': 'Person',
+        '@id': 'https://maayanbashan.co.il/#person',
         name: 'מעיין בשן',
-        sameAs: 'https://maayanbashan.co.il',
-      },
-      offers: {
-        '@type': 'Offer',
-        price: '1600',
-        priceCurrency: 'ILS',
-        availability: 'https://schema.org/InStock',
-        url: 'https://maayanbashan.co.il/body-language-course/',
-      },
-      hasCourseInstance: {
-        '@type': 'CourseInstance',
-        courseMode: 'Onsite',
-        location: {
-          '@type': 'Place',
-          name: 'הרצליה',
+        alternateName: ['מעין בשן', 'מעיין בשן פולק', 'Maayan Bashan'],
+        jobTitle: 'מומחית שפת גוף ותקשורת בלתי-מילולית',
+        url: 'https://maayanbashan.co.il',
+        affiliation: {
+          '@type': 'CollegeOrUniversity',
+          name: 'אוניברסיטת אריאל',
+          sameAs: 'https://www.ariel.ac.il/',
         },
-        startDate: '2026-10-23',
+        sameAs: [
+          'https://www.instagram.com/maayan.bashan/',
+          'https://www.facebook.com/sfatgoof1/',
+          'https://www.youtube.com/@Maayan.bashan',
+          'https://www.tiktok.com/@maayan.bashan',
+        ],
       },
+      {
+        '@type': 'Course',
+        '@id': 'https://maayanbashan.co.il/body-language-course/#course',
+        name: 'קורס ניתוח גוף פתוח',
+        description: 'הכשרה מקצועית בשפת גוף ובתקשורת בלתי-מילולית עם מעיין בשן - 25 שעות, 5 מפגשי עומק, תרגול מונחה ופידבק אישי. זיהוי חוסר אמת ומניפולציה, נוכחות והשפעה.',
+        inLanguage: 'he-IL',
+        provider: { '@id': 'https://maayanbashan.co.il/#person' },
+        offers: {
+          '@type': 'Offer',
+          price: '1600',
+          priceCurrency: 'ILS',
+          availability: 'https://schema.org/InStock',
+          url: 'https://maayanbashan.co.il/body-language-course/',
+        },
+        hasCourseInstance: {
+          '@type': 'CourseInstance',
+          courseMode: 'Onsite',
+          location: { '@type': 'Place', name: 'הרצליה' },
+          startDate: '2026-10-23',
+        },
+      },
+      {
+        '@type': 'FAQPage',
+        '@id': 'https://maayanbashan.co.il/body-language-course/#faq',
+        mainEntity: faqs.map((f) => ({
+          '@type': 'Question',
+          name: f.q,
+          acceptedAnswer: { '@type': 'Answer', text: f.a },
+        })),
+      },
+      ],
     })} />
     <MetaPixel />
   </head>
   <body>
     <Attribution />
     <nav class="lp-nav">
-      <a href="/" class="lp-logo"><img src="/images/logo-white.png" alt="מעיין בשן" /></a>
+      <a href="/" class="lp-logo"><img src="/images/logo-white.png" alt="מעיין בשן - לוגו" /></a>
       <a href="#register" class="lp-nav-cta">הרשמה לקורס</a>
     </nav>
 
@@ -163,7 +190,7 @@ const faqs = [
       </div>
       <div class="lp-hero-image">
         <span class="lp-hero-halo" aria-hidden="true"></span>
-        <img src="/images/maayan-hero.png" alt="מעיין בשן" />
+        <img src="/images/maayan-hero.webp" alt="מעיין בשן, מנחת קורס שפת הגוף ניתוח גוף פתוח" />
       </div>
     </section>
 
@@ -198,7 +225,7 @@ const faqs = [
       <div class="lp-inner lp-story-grid">
         <div class="lp-story-photo">
           <span class="lp-photo-ring" aria-hidden="true"></span>
-          <img src="/images/maayan-story.jpg" alt="מעיין בשן" width="760" height="760" loading="lazy" />
+          <img src="/images/maayan-story.jpg" alt="מעיין בשן, מומחית שפת גוף" width="760" height="760" loading="lazy" />
         </div>
         <div class="lp-story-text">
           <div class="lp-eyebrow">הסיפור שמאחורי השיטה</div>

@@ -2,7 +2,19 @@
 import SocialIcons from './SocialIcons.astro';
 ---
 <footer class="site-footer">
-  <img class="footer-logo" src="/images/logo-white.png" alt="מעיין בשן" />
+  <img class="footer-logo" src="/images/logo-white.png" alt="מעיין בשן - לוגו" />
+  <!-- The two course landing pages are built without the site nav, so this is
+       the only route from them into the rest of the site. -->
+  <nav class="footer-nav" aria-label="ניווט תחתון">
+    <a href="/">בית</a>
+    <a href="/about/">אודות</a>
+    <a href="/courses/">הרצאות וקורסים</a>
+    <a href="/body-language-course/">קורס שפת גוף</a>
+    <a href="/guides/">מדריכים</a>
+    <a href="/media/">מהמדיה</a>
+    <a href="/organizations/">ארגונים</a>
+    <a href="/contact/">צור קשר</a>
+  </nav>
   <p>© {new Date().getFullYear()} מעיין בשן. כל הזכויות שמורות.</p>
   <div class="socials">
     <SocialIcons />
@@ -19,6 +31,18 @@ import SocialIcons from './SocialIcons.astro';
     opacity: 0.75;
     font-size: 0.9rem;
   }
+  /* Literal colours, not tokens: the course landing pages redefine the global
+     custom properties locally and would otherwise repaint this. */
+  .footer-nav {
+    display: flex; flex-wrap: wrap; justify-content: center;
+    gap: 0.6rem 1.4rem;
+    margin: 0 auto 1.2rem; max-width: 640px;
+  }
+  .footer-nav a {
+    color: #f3efe3; opacity: 0.8;
+    font-size: 0.92rem; text-decoration: none;
+  }
+  .footer-nav a:hover { opacity: 1; color: #c9a05c; text-decoration: underline; }
   .socials {
     margin-top: 0.85rem;
     color: #c9a05c;

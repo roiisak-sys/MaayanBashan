@@ -1,7 +1,7 @@
 ---
 title: מעיין בשן
 tagline: לקרוא אנשים כמו ספר פתוח
-heroImage: /images/maayan-hero.png
+heroImage: /images/maayan-hero.webp
 shortBio: מומחית שפת גוף, מרצה ופרשנית תקשורת לא מילולית.
 phone: "0505585177"
 email: maayan.inst@gmail.com

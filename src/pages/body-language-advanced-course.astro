@@ -97,40 +97,76 @@ const faqs = [
     <meta property="og:site_name" content="מעיין בשן" />
     <meta name="twitter:card" content="summary_large_image" />
 
-    <!-- Structured data: Course -->
+    <!-- Structured data: Person + Course + FAQ + Video -->
     <script type="application/ld+json" set:html={JSON.stringify({
       '@context': 'https://schema.org',
-      '@type': 'Course',
-      name: 'שפת גוף - קורס מתקדמים',
-      description: 'קורס המשך לבוגרי "ניתוח גוף פתוח" - 6 מפגשי העשרה ותרגול מעשי: אלימות והפרעות אישיות, זוגיות ודייטים, סטוריטלינג, שקרים, משא ומתן.',
-      provider: {
+      '@graph': [
+      {
         '@type': 'Person',
+        '@id': 'https://maayanbashan.co.il/#person',
         name: 'מעיין בשן',
-        sameAs: 'https://maayanbashan.co.il',
-      },
-      offers: {
-        '@type': 'Offer',
-        price: '3800',
-        priceCurrency: 'ILS',
-        availability: 'https://schema.org/InStock',
-        url: 'https://maayanbashan.co.il/body-language-advanced-course/',
-      },
-      hasCourseInstance: {
-        '@type': 'CourseInstance',
-        courseMode: 'Onsite',
-        location: {
-          '@type': 'Place',
-          name: 'אשכול פיס, הרצליה',
+        alternateName: ['מעין בשן', 'מעיין בשן פולק', 'Maayan Bashan'],
+        jobTitle: 'מומחית שפת גוף ותקשורת בלתי-מילולית',
+        url: 'https://maayanbashan.co.il',
+        affiliation: {
+          '@type': 'CollegeOrUniversity',
+          name: 'אוניברסיטת אריאל',
+          sameAs: 'https://www.ariel.ac.il/',
         },
-        startDate: '2027-01-06',
+        sameAs: [
+          'https://www.instagram.com/maayan.bashan/',
+          'https://www.facebook.com/sfatgoof1/',
+          'https://www.youtube.com/@Maayan.bashan',
+          'https://www.tiktok.com/@maayan.bashan',
+        ],
       },
+      {
+        '@type': 'Course',
+        '@id': 'https://maayanbashan.co.il/body-language-advanced-course/#course',
+        name: 'שפת גוף - קורס מתקדמים',
+        description: 'קורס המשך לבוגרי "ניתוח גוף פתוח" - 6 מפגשי העשרה ותרגול מעשי: אלימות והפרעות אישיות, זוגיות ודייטים, סטוריטלינג, שקרים, משא ומתן.',
+        inLanguage: 'he-IL',
+        provider: { '@id': 'https://maayanbashan.co.il/#person' },
+        offers: {
+          '@type': 'Offer',
+          price: '3800',
+          priceCurrency: 'ILS',
+          availability: 'https://schema.org/InStock',
+          url: 'https://maayanbashan.co.il/body-language-advanced-course/',
+        },
+        hasCourseInstance: {
+          '@type': 'CourseInstance',
+          courseMode: 'Onsite',
+          location: { '@type': 'Place', name: 'אשכול פיס, הרצליה' },
+          startDate: '2027-01-06',
+        },
+      },
+      {
+        '@type': 'FAQPage',
+        '@id': 'https://maayanbashan.co.il/body-language-advanced-course/#faq',
+        mainEntity: faqs.map((f) => ({
+          '@type': 'Question',
+          name: f.q,
+          acceptedAnswer: { '@type': 'Answer', text: f.a },
+        })),
+      },
+      {
+        '@type': 'VideoObject',
+        name: 'בוגרים מספרים - קורס שפת גוף של מעיין בשן',
+        description: 'בוגרי הקורס "ניתוח גוף פתוח" מספרים על ההכשרה ועל מה שהיא שינתה אצלם.',
+        thumbnailUrl: 'https://i.ytimg.com/vi/NqNVme4Aka0/hqdefault.jpg',
+        embedUrl: 'https://www.youtube-nocookie.com/embed/NqNVme4Aka0',
+        uploadDate: '2026-10-01',
+        publisher: { '@id': 'https://maayanbashan.co.il/#person' },
+      },
+      ],
     })} />
     <MetaPixel />
   </head>
   <body>
     <Attribution />
     <nav class="ac-nav">
-      <a href="/" class="ac-logo"><img src="/images/logo-white.png" alt="מעיין בשן" /></a>
+      <a href="/" class="ac-logo"><img src="/images/logo-white.png" alt="מעיין בשן - לוגו" /></a>
       <a href="#register" class="ac-nav-cta">הרשמה לקורס</a>
     </nav>
 
@@ -166,7 +202,7 @@ const faqs = [
           </div>
           <div class="ac-practice-photo">
             <span class="ac-practice-photo-frame" aria-hidden="true"></span>
-            <img src="/images/maayan-hero.png" alt="מעיין בשן" />
+            <img src="/images/maayan-hero.webp" alt="מעיין בשן, מנחת קורס שפת הגוף למתקדמים" />
           </div>
         </div>
         <div class="ac-practice-grid">
@@ -263,8 +299,8 @@ const faqs = [
     <section class="ac-section reveal">
       <div class="ac-inner ac-guest-grid">
         <div class="ac-guest-photos">
-          <img src="/images/advanced-course/maayan-amnon-piggyback.jpg" alt="מעיין בשן ואמנון וולף" class="ac-guest-photo-main" />
-          <img src="/images/advanced-course/maayan-amnon-back-to-back.jpg" alt="מעיין בשן ואמנון וולף" class="ac-guest-photo-accent" />
+          <img src="/images/advanced-course/maayan-amnon-piggyback.webp" alt="מעיין בשן והשחקן אמנון וולף, מנחי מפגשי הסטוריטלינג בקורס המתקדמים" class="ac-guest-photo-main" />
+          <img src="/images/advanced-course/maayan-amnon-back-to-back.webp" alt="מעיין בשן ואמנון וולף גב אל גב" class="ac-guest-photo-accent" />
         </div>
         <div class="ac-guest-text">
           <div class="ac-eyebrow">אורח מיוחד בשני מפגשי הסטוריטלינג</div>
@@ -351,7 +387,7 @@ const faqs = [
             <div class="ac-urgency"><span class="ac-urgency-dot"></span> עד 40 בוגרים בלבד - פחות ממה שזה נשמע</div>
           </div>
           <div class="ac-info-card">
-            <span class="ac-info-photo"><img src="/images/maayan-hero.png" alt="מעיין בשן" /></span>
+            <span class="ac-info-photo"><img src="/images/maayan-hero.webp" alt="מעיין בשן, מומחית שפת גוף" /></span>
             <span class="ac-info-tag">🎓 למי זה מתאים</span>
             <h3>רק לבוגרי הקורס הבסיסי</h3>
             <p>קורס ההמשך בנוי במיוחד לבוגרי "ניתוח גוף פתוח" שרוצים לקחת את הידע צעד אחד קדימה - להפסיק רק לנתח, ולהתחיל ליישם את שפת הגוף בסיטואציות הכי מורכבות: מול קהל, בזוגיות, במשא ומתן ובזיהוי מניפולציות.</p>

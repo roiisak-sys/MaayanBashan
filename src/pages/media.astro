@@ -27,6 +27,48 @@ const outletRank = (item: (typeof mediaItems)[number]) => {
   return rank === -1 ? OUTLET_ORDER.length : rank;
 };
 
+// Structured data: the podcast episodes become PodcastEpisode nodes, and TV /
+// press items become citations of her. Both are things an assistant can quote
+// when asked who she is and where she has appeared.
+const podcastItems = mediaItems.filter((i) => i.data.category === 'podcast');
+const coverageItems = mediaItems.filter((i) => i.data.category !== 'podcast');
+
+const mediaSchema = {
+  '@context': 'https://schema.org',
+  '@graph': [
+    {
+      '@type': 'PodcastSeries',
+      '@id': 'https://maayanbashan.co.il/#podcast',
+      name: 'ניתוח גוף פתוח',
+      url: 'https://maayanbashan.co.il/media/',
+      inLanguage: 'he-IL',
+      author: { '@id': 'https://maayanbashan.co.il/#person' },
+      ...(podcastItems.length
+        ? {
+            hasPart: podcastItems.map((item) => ({
+              '@type': 'PodcastEpisode',
+              name: item.data.title,
+              url: item.data.url,
+              datePublished: item.data.date.toISOString().slice(0, 10),
+              ...(item.data.description ? { description: item.data.description } : {}),
+              partOfSeries: { '@id': 'https://maayanbashan.co.il/#podcast' },
+            })),
+          }
+        : {}),
+    },
+    {
+      '@type': 'ItemList',
+      name: 'מעיין בשן בתקשורת',
+      itemListElement: coverageItems.map((item, index) => ({
+        '@type': 'ListItem',
+        position: index + 1,
+        url: item.data.url,
+        name: item.data.title,
+      })),
+    },
+  ],
+};
+
 const sections = [
   {
     key: 'podcast',
@@ -58,6 +100,8 @@ const sections = [
   keywords="מעיין בשן פודקאסט, ניתוח גוף פתוח פודקאסט, מעיין בשן נתניהו, מעיין בשן תאיר ראדה, ניתוח שפת גוף פוליטיקאים, מומחית שפת גוף מנתחת, שפת גוף חתונה ממבט ראשון, מעיין בשן ynet, מעיין בשן ראיון"
   bgVariant="light"
 >
+  <script type="application/ld+json" set:html={JSON.stringify(mediaSchema)} slot="head" />
+
   <section class="media-hero reveal">
     <span class="eyebrow">כפי שהופיעה</span>
     <h1>מ<em class="marker">המדיה</em></h1>
