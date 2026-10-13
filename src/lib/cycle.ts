@@ -27,7 +27,7 @@ export const isoDate = (d: Date): string => d.toISOString().slice(0, 10);
 
 /**
  * A human label for the cohort, widening only as far as the dates require:
- *   crosses a year  → "דצמבר 2026 – ינואר 2027"
+ *   crosses a year  → "דצמבר 2026 עד ינואר 2027" (words, not a spaced dash)
  *   spans months    → "אוקטובר–נובמבר 2026"
  *   single month    → "דצמבר 2026"
  */
@@ -42,7 +42,7 @@ export function cycleLabel(sessions: Date[] = []): string {
   const lastMonth = HE_MONTHS[last.getUTCMonth()];
   const lastYear = last.getUTCFullYear();
 
-  if (firstYear !== lastYear) return `${firstMonth} ${firstYear} – ${lastMonth} ${lastYear}`;
+  if (firstYear !== lastYear) return `${firstMonth} ${firstYear} עד ${lastMonth} ${lastYear}`;
   if (firstMonth !== lastMonth) return `${firstMonth}–${lastMonth} ${firstYear}`;
   return `${firstMonth} ${firstYear}`;
 }
