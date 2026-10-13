@@ -73,6 +73,9 @@ const guides = defineCollection({
     title: z.string(),
     // Used in listings and breadcrumbs, where the full title is too long.
     shortTitle: z.string(),
+    // The <title> tag, when the editorial title would overflow the ~60
+    // characters a SERP shows. Falls back to `title`.
+    seoTitle: z.string().optional(),
     description: z.string(),
     keywords: z.string(),
     summary: z.string(),

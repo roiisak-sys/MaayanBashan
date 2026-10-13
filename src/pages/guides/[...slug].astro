@@ -9,7 +9,7 @@ export async function getStaticPaths() {
 
 const { guide } = Astro.props;
 const { Content } = await render(guide);
-const { title, shortTitle, description, keywords, summary, updated, faq } = guide.data;
+const { title, shortTitle, seoTitle, description, keywords, summary, updated, faq } = guide.data;
 
 const url = `https://maayanbashan.co.il/guides/${guide.id}/`;
 const updatedISO = updated.toISOString().slice(0, 10);
@@ -62,7 +62,7 @@ const schema = {
 };
 ---
 
-<BaseLayout title={title} description={description} keywords={keywords} bgVariant="mid">
+<BaseLayout title={seoTitle ?? title} description={description} keywords={keywords} bgVariant="mid" dateModified={updated}>
   <script type="application/ld+json" set:html={JSON.stringify(schema)} slot="head" />
 
   <article class="guide">

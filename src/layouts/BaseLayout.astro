@@ -11,6 +11,9 @@ interface Props {
   keywords?: string;
   ogImage?: string;
   bgVariant?: 'deep' | 'base' | 'mid' | 'light';
+  /** Only pass this when the page has a genuine last-updated date behind it.
+   *  Omitted rather than invented, so the signal stays truthful. */
+  dateModified?: Date;
 }
 const {
   title,
@@ -18,12 +21,18 @@ const {
   keywords = 'מעיין בשן, מעין בשן, מעיין בשן פולק, שפת גוף, שפתגוף, מומחית שפת גוף, מומחה שפת גוף, ניתוח גוף פתוח, קריאת שפת גוף, תקשורת לא מילולית, זיהוי שקרים, מיקרו הבעות',
   ogImage = '/images/maayan-hero.png',
   bgVariant = 'base',
+  dateModified,
 } = Astro.props;
 
 const canonicalURL = new URL(Astro.url.pathname, Astro.site);
 const ogImageURL = new URL(ogImage, Astro.site);
 const isHome = Astro.url.pathname === '/';
-const fullTitle = isHome ? title : `${title} | מעיין בשן - מומחית שפת גוף`;
+// The old suffix ("| מעיין בשן - מומחית שפת גוף") pushed several titles past
+// the ~60 characters a SERP shows, so the brand was being cut off. It is now
+// short, and skipped entirely when the page title already names her.
+const fullTitle = isHome || title.includes('מעיין בשן')
+  ? title
+  : `${title} | מעיין בשן`;
 import Attribution from '../components/Attribution.astro';
 ---
 <!doctype html>
@@ -129,6 +138,18 @@ import Attribution from '../components/Attribution.astro';
             'https://open.spotify.com/show/03Rq0mo36Cz92l8sHh5ltL',
             'https://creators.spotify.com/pod/profile/maayan-bashan/',
           ],
+        },
+        {
+          '@type': 'WebPage',
+          '@id': `${canonicalURL.toString()}#webpage`,
+          url: canonicalURL.toString(),
+          name: fullTitle,
+          description,
+          inLanguage: 'he-IL',
+          isPartOf: { '@id': 'https://maayanbashan.co.il/#website' },
+          about: { '@id': 'https://maayanbashan.co.il/#person' },
+          primaryImageOfPage: ogImageURL.toString(),
+          ...(dateModified ? { dateModified: dateModified.toISOString().slice(0, 10) } : {}),
         },
         {
           '@type': 'WebSite',

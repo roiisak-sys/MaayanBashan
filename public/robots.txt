@@ -52,4 +52,17 @@ User-agent: Bingbot
 Allow: /
 Disallow: /admin/
 
+# Common Crawl feeds a large share of LLM training and retrieval corpora.
+User-agent: CCBot
+Allow: /
+Disallow: /admin/
+
+User-agent: meta-externalagent
+Allow: /
+Disallow: /admin/
+
+User-agent: Amazonbot
+Allow: /
+Disallow: /admin/
+
 Sitemap: https://maayanbashan.co.il/sitemap-index.xml
