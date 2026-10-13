@@ -25,7 +25,7 @@ import { unifiedFallbackLead } from './lib/unified-lead.mjs';
 
 const ADMIN_BASE_URL = process.env.ADMIN_BASE_URL || 'https://admin.talbashan.co.il';
 const COURSE_PRICE = Number(process.env.COURSE_PRICE || 1600);
-const COURSE_TITLE = process.env.COURSE_TITLE || 'קורס ניתוח גוף פתוח - מחזור אוקטובר 2026';
+const COURSE_TITLE = process.env.COURSE_TITLE || 'קורס ניתוח גוף פתוח - מחזור דצמבר 2026';
 const SOURCE_LABEL = 'דף נחיתה - קורס שפת גוף';
 // Used only if the engine is unreachable, so a buyer is never left without
 // a way to pay.
