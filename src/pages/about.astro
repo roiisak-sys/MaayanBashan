@@ -4,6 +4,42 @@ import { getEntry, render } from 'astro:content';
 
 const about = await getEntry('about', 'about');
 const { Content } = about ? await render(about) : { Content: null };
+
+// Rendered on the page and emitted as FAQPage: this is the page that answers
+// "who is Maayan Bashan", and these are the extractable forms of that answer.
+const faqs = [
+  {
+    q: 'מי זו מעיין בשן?',
+    a: 'מומחית שפת גוף ותקשורת בלתי-מילולית עם למעלה מ-20 שנה בתחום. מרצה בחוג לפרופילאות פלילית באוניברסיטת אריאל, פרשנית קבועה בתקשורת הישראלית, ומנחה את הפודקאסט "ניתוח גוף פתוח" יחד עם השחקן אמנון וולף. לימדה אלפי בוגרים ומאות ארגונים.',
+  },
+  {
+    q: 'מה ההכשרה של מעיין בשן?',
+    a: 'שנים של לימוד בשפת גוף, תקשורת בלתי-מילולית, פסיכולוגיה וטיפול, הכשרות בארץ ובעולם, ואלפי שעות של תרגול ועבודה עם אנשים. היא גם מטפלת ומנחת קבוצות בהכשרתה, ועל הבסיס הזה פיתחה שיטת לימוד משלה.',
+  },
+  {
+    q: 'איפה אפשר ללמוד שפת גוף אצל מעיין בשן?',
+    a: 'בקורס "ניתוח גוף פתוח" — 25 שעות הכשרה מעשית בחמישה מפגשים בהרצליה — ובקורס המתקדמים לבוגרי הקורס הבסיסי. בנוסף היא מעבירה הרצאות וסדנאות בארגונים ובחברות.',
+  },
+  {
+    q: 'האם באמת אפשר ללמוד לזהות שקרים לפי שפת גוף?',
+    a: 'לא במובן שבו זה משווק. אין מחווה שמוכיחה שקר. מה שכן אפשר ללמוד הוא לזהות עלייה במאמץ ובמתח, ולנהל שיחה שמאפשרת לברר. זו הגישה שמעיין מלמדת, ובדיוק משום כך היא מלמדת שיטה ולא רשימת סימנים.',
+  },
+  {
+    q: 'איך מזמינים את מעיין בשן להרצאה?',
+    a: 'דרך עמוד יצירת הקשר באתר, בטלפון 050-5585177 או בהודעת וואטסאפ.',
+  },
+];
+
+const faqSchema = {
+  '@context': 'https://schema.org',
+  '@type': 'FAQPage',
+  '@id': 'https://maayanbashan.co.il/about/#faq',
+  mainEntity: faqs.map((f) => ({
+    '@type': 'Question',
+    name: f.q,
+    acceptedAnswer: { '@type': 'Answer', text: f.a },
+  })),
+};
 ---
 <BaseLayout
   title="אודות מעיין בשן - מומחית שפת גוף"
@@ -11,17 +47,56 @@ const { Content } = about ? await render(about) : { Content: null };
   keywords="מעיין בשן, מעין בשן, מעיין בשן פולק, מי זו מעיין בשן, מעיין בשן ויקיפדיה, מעיין בשן גיל, מומחית שפת גוף, מרצה שפת גוף, פרופיילינג, אוניברסיטת אריאל פרופילאות פלילית"
   bgVariant="mid"
 >
+  <script type="application/ld+json" set:html={JSON.stringify(faqSchema)} slot="head" />
+
   <section class="about-page reveal">
     <span class="eyebrow">הסיפור שמאחורי השיטה</span>
     <h1>{about?.data.title}</h1>
     <div class="content">
       {Content && <Content />}
     </div>
+
+    <section class="about-faq">
+      <h2>שאלות נפוצות</h2>
+      {faqs.map((f) => (
+        <details>
+          <summary>{f.q}</summary>
+          <p>{f.a}</p>
+        </details>
+      ))}
+    </section>
   </section>
 </BaseLayout>
 <style>
   .about-page { max-width: 720px; margin: 0 auto; padding: 4rem 2rem; }
   .about-page h1 { color: var(--gold); font-size: clamp(2rem, 4vw, 2.75rem); margin-bottom: 1.5rem; }
+  /* Styling markdown the collection renders, hence the descendant selectors. */
+  .content :global(h2) {
+    color: var(--gold);
+    font-size: clamp(1.3rem, 2.8vw, 1.7rem);
+    margin: 2.6rem 0 0.9rem;
+    line-height: 1.35;
+  }
+  .content :global(strong) { color: var(--ink); font-weight: 700; }
+  .content :global(a) { color: var(--gold); }
+
+  .about-faq { margin-top: 3.2rem; }
+  .about-faq h2 {
+    color: var(--gold);
+    font-size: clamp(1.3rem, 2.8vw, 1.7rem);
+    margin-bottom: 1.1rem;
+  }
+  .about-faq details {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 0.9rem 1.1rem;
+    margin-bottom: 0.7rem;
+    background: var(--card);
+  }
+  .about-faq summary { cursor: pointer; font-weight: 700; color: var(--ink); line-height: 1.5; }
+  .about-faq details[open] summary { margin-bottom: 0.7rem; }
+  .about-faq p { margin: 0; color: var(--ink-dim); line-height: 1.85; }
+
   .content :global(p) { line-height: 1.85; margin-bottom: 1.1rem; font-size: 1.05rem; color: var(--ink-dim); }
   .content :global(img) {
     margin: 0 auto 2rem;
