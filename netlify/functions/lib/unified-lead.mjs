@@ -44,7 +44,7 @@ const CLOSED_STATUSES = ['שילם', 'רכש', 'חינם'];
 // engine's maayan-id-map.json). An id not in the map is taken to be a cycle
 // id in the unified base already.
 const OLD_COURSE_TO_CYCLE = {
-  recjezzByzUmQ5VYo: 'recUmeUfXaxtH0SVO', // קורס שפת גוף אוקטובר 2026
+  recjezzByzUmQ5VYo: 'recUmeUfXaxtH0SVO', // קורס שפת גוף (the old Maayan course id)
   recqLb5JoZHMR2peH: 'recmmoYbDcBkMRAPJ', // קורס שפת גוף מתקדמים ינואר 2027
 };
 export function toCycleId(courseRecordId) {

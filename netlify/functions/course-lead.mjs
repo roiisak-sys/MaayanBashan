@@ -24,21 +24,45 @@ import { unifiedFallbackLead } from './lib/unified-lead.mjs';
 // nobody had touched, including test rows.
 
 const ADMIN_BASE_URL = process.env.ADMIN_BASE_URL || 'https://admin.talbashan.co.il';
-const COURSE_PRICE = Number(process.env.COURSE_PRICE || 1600);
-const COURSE_TITLE = process.env.COURSE_TITLE || 'קורס ניתוח גוף פתוח - מחזור אוקטובר 2026';
 const SOURCE_LABEL = 'דף נחיתה - קורס שפת גוף';
 // Used only if the engine is unreachable, so a buyer is never left without
 // a way to pay.
 const FALLBACK_PAYMENT_URL = 'https://secure.cardcom.solutions/EA/EA5/4SwsNP9VJ0ueOlqA9OOBzg/PaymentSP';
 
-// קורס שפת גוף אוקטובר 2026 — for the next cohort, override with the
-// COURSE_RECORD_ID environment variable instead of editing this file.
-const DEFAULT_COURSE_RECORD_ID = 'recjezzByzUmQ5VYo';
+// The course product ("קורס שפת גוף") in the unified base. The engine resolves
+// it to its next open cycle, so the date, price and title on the pay page
+// always follow the active cycle in Airtable. A new cohort needs no edit here.
+// Until 15.10.2026 the title and price were hardcoded in this file, and every
+// pay link kept saying "מחזור אוקטובר" after the course moved to December.
+const COURSE_PRODUCT_ID = process.env.COURSE_PRODUCT_ID || 'recM5qlPShBRueS1t';
+
+// Only for the fallback path, when the engine cannot be reached at all and
+// the active cycle is unknown: the lead still lands on the last known cycle.
+const LAST_KNOWN_COURSE_RECORD_ID = 'recjezzByzUmQ5VYo';
+
+// The product's next open cycle, from the same public endpoint the engine's
+// own /buy page uses. Null if there is no open cycle or the engine is down.
+async function activeCycleId() {
+  try {
+    const response = await fetch(`${ADMIN_BASE_URL}/public/offer/${COURSE_PRODUCT_ID}`, {
+      signal: AbortSignal.timeout(5000),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || !data.cycleId) {
+      console.error('active cycle lookup failed', response.status, JSON.stringify(data));
+      return null;
+    }
+    return data.cycleId;
+  } catch (error) {
+    console.error('active cycle lookup unreachable', error.message);
+    return null;
+  }
+}
 
 // The engine creates (or updates) the lead and returns the branded pay page.
 // It dedupes live against Airtable, so a repeat submission updates the same
 // row instead of opening another one.
-async function engineLead({ name, phone, email, courseRecordId, utm }) {
+async function engineLead({ name, phone, email, cycleId, utm }) {
   const key = process.env.ADMIN_INTERNAL_KEY;
   if (!key) {
     console.error('ADMIN_INTERNAL_KEY is not configured - falling back to a direct Airtable write');
@@ -53,10 +77,8 @@ async function engineLead({ name, phone, email, courseRecordId, utm }) {
         name,
         phone,
         email,
-        amount: COURSE_PRICE,
-        description: COURSE_TITLE,
-        // the engine maps an old Maayan course id to its cycle in the unified base
-        cycleId: courseRecordId,
+        // Price, title and cycle all come from this cycle's record in Airtable.
+        offerId: cycleId,
         source: SOURCE_LABEL,
         // Ad attribution travels with the lead: the engine writes it to the
         // same four fields the reports already read.
@@ -113,11 +135,12 @@ export default async (request) => {
     fbclid: String(payload.fbclid ?? '').trim().slice(0, 300),
   };
 
-  const courseRecordId = process.env.COURSE_RECORD_ID || DEFAULT_COURSE_RECORD_ID;
+  const cycleId = await activeCycleId();
 
-  const payUrl = await engineLead({ name, phone, email, courseRecordId, utm });
+  const payUrl = cycleId ? await engineLead({ name, phone, email, cycleId, utm }) : null;
   if (payUrl) return Response.json({ ok: true, payUrl });
 
+  const courseRecordId = cycleId || LAST_KNOWN_COURSE_RECORD_ID;
   const saved = await unifiedFallbackLead({ name, phone, email, courseRecordId, source: SOURCE_LABEL, utm });
   if (!saved) return Response.json({ ok: false, error: 'lead not saved' }, { status: 502 });
   return Response.json({ ok: true, payUrl: FALLBACK_PAYMENT_URL, degraded: true });
