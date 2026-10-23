@@ -1,7 +1,7 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
-import PartnerLogos from '../components/PartnerLogos.astro';
 import ClientMarquee from '../components/ClientMarquee.astro';
+import PhotoCarousel from '../components/PhotoCarousel.astro';
 import { getEntry, getCollection, render } from 'astro:content';
 
 const org = await getEntry('organizations', 'organizations');
@@ -19,6 +19,7 @@ const lectures = org?.data.lectures ?? [];
 const process = org?.data.process ?? [];
 const faq = org?.data.faq ?? [];
 const testimonials = org?.data.testimonials ?? [];
+const photos = org?.data.photos ?? [];
 
 // Clients come from two places: the logo collection, which carries an image,
 // and the entry's own list, which is name only. Logos lead the strip, and a
@@ -122,7 +123,7 @@ const schema = {
   </section>
 
   <ClientMarquee clients={clients} />
-  <PartnerLogos />
+  <PhotoCarousel photos={photos} />
 
   {lectures.length > 0 && (
     <section class="lectures reveal">
@@ -164,7 +165,7 @@ const schema = {
     <section class="process reveal">
       <div class="section-inner">
         <span class="eyebrow">איך זה עובד</span>
-        <h2>מהשיחה הראשונה ועד החדר</h2>
+        <h2>מהשיחה הראשונה ועד האירוע</h2>
         <ol class="process-list">
           {process.map((s, i) => (
             <li>

@@ -52,6 +52,10 @@ const organizations = defineCollection({
       .default([]),
     // Numbered "how it works" steps, from first call to the room.
     process: z.array(z.object({ title: z.string(), description: z.string() })).default([]),
+    // Photographs from real lectures, shown as a swipeable strip. Alt text is
+    // required rather than optional: the strip is the page's only visual proof
+    // and it has to describe itself to screen readers and to crawlers.
+    photos: z.array(z.object({ src: z.string(), alt: z.string() })).default([]),
     // Rendered on the page and emitted as FAQPage structured data.
     faq: z.array(z.object({ q: z.string(), a: z.string() })).default([]),
     // Organizations Maayan has actually worked with. Only entries confirmed by
