@@ -33,6 +33,45 @@ const organizations = defineCollection({
     title: z.string(),
     intro: z.string(),
     benefits: z.array(z.object({ title: z.string(), description: z.string() })),
+    // The lecture catalogue. Each entry is rendered as a card and emitted as an
+    // offer in the Service structured data, so a lecture added here appears on
+    // the page and in the schema without touching the template.
+    lectures: z
+      .array(
+        z.object({
+          title: z.string(),
+          duration: z.string().optional(),
+          summary: z.string(),
+          forWhom: z.string().optional(),
+          takeaways: z.array(z.string()).default([]),
+          // Co-presented lectures name the guest; drives the "בשיתוף" line.
+          guest: z.string().optional(),
+          featured: z.boolean().default(false),
+        })
+      )
+      .default([]),
+    // Numbered "how it works" steps, from first call to the room.
+    process: z.array(z.object({ title: z.string(), description: z.string() })).default([]),
+    // Rendered on the page and emitted as FAQPage structured data.
+    faq: z.array(z.object({ q: z.string(), a: z.string() })).default([]),
+    // Organizations Maayan has actually worked with. Only entries confirmed by
+    // email or by a past calendar booking belong here: a quote request is not a
+    // client. `logo` is optional, and a name without one renders as a chip, so
+    // the strip stays truthful while logo files are collected.
+    clients: z.array(z.object({ name: z.string(), logo: z.string().optional() })).default([]),
+    // Verbatim quotes. Nothing here may be paraphrased or invented, and an
+    // unverified quote stays out of the file rather than going in unattributed.
+    testimonials: z
+      .array(
+        z.object({
+          quote: z.string(),
+          author: z.string(),
+          role: z.string().optional(),
+          org: z.string().optional(),
+          date: z.string().optional(),
+        })
+      )
+      .default([]),
     closing: z.string(),
   }),
 });
@@ -104,6 +143,15 @@ const partnerLogos = defineCollection({
   schema: z.object({
     name: z.string(),
     logo: z.string(),
+    // The strip used to run every logo under "כפי שהופיעה ב", which reads as a
+    // media appearance and was wrong for the organizations among them. `media`
+    // keeps that heading; `client` moves the logo to the organizations strip.
+    kind: z.enum(['media', 'client']).default('media'),
+    // Set when the artwork is dark and would vanish against the dark strip; it
+    // is then recoloured to a white silhouette. Logos that already read light
+    // are left alone, because whitening those flattens their interior detail
+    // into a solid blob.
+    darkArtwork: z.boolean().default(false),
   }),
 });
 

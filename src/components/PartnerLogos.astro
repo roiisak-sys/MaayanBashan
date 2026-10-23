@@ -1,6 +1,8 @@
 ---
 import { getCollection } from 'astro:content';
-const logos = await getCollection('partner_logos');
+// Media outlets only. Organizations carrying `kind: client` belong in the
+// clients strip, where they are not presented as press coverage.
+const logos = (await getCollection('partner_logos')).filter((l) => l.data.kind !== 'client');
 ---
 {logos.length > 0 && (
   <section class="partner-logos section-ink">

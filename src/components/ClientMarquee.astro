@@ -1,0 +1,94 @@
+---
+// A continuously scrolling strip of organizations Maayan has worked with.
+//
+// Entries carry a logo when one exists and render as a name chip when they do
+// not, so the strip can go live before every logo file has been collected and
+// upgrades one entry at a time as they arrive.
+interface Props {
+  clients: { name: string; logo?: string; darkArtwork?: boolean }[];
+  title?: string;
+}
+const { clients, title = 'ארגונים שעבדו עם מעיין' } = Astro.props;
+
+// The track is rendered twice so the loop has no visible seam. The duplicate is
+// hidden from assistive tech and from the accessible name of the section.
+const track = [...clients, ...clients];
+---
+{clients.length > 0 && (
+  <section class="client-marquee" aria-label={title}>
+    <span class="eyebrow eyebrow-orange">{title}</span>
+    <div class="marquee-viewport">
+      <ul class="marquee-track" style={`--count:${clients.length}`}>
+        {track.map((c, i) => (
+          <li aria-hidden={i >= clients.length ? 'true' : undefined}>
+            {c.logo
+              ? <img src={c.logo} alt={c.name} loading="lazy" class={c.darkArtwork ? 'is-dark' : undefined} />
+              : <span class="client-chip">{c.name}</span>}
+          </li>
+        ))}
+      </ul>
+    </div>
+  </section>
+)}
+<style>
+  .client-marquee { padding: 2.5rem 0; text-align: center; overflow: hidden; }
+  .client-marquee .eyebrow { display: block; text-align: center; margin-bottom: 1.5rem; font-size: 1rem; }
+
+  /* The viewport masks the track at both edges so items fade rather than being
+     chopped off mid-word as they enter and leave. */
+  .marquee-viewport {
+    position: relative;
+    -webkit-mask-image: linear-gradient(to left, transparent, #000 8%, #000 92%, transparent);
+    mask-image: linear-gradient(to left, transparent, #000 8%, #000 92%, transparent);
+  }
+  .marquee-track {
+    display: flex;
+    align-items: center;
+    gap: 2.5rem;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    width: max-content;
+    /* One cycle moves exactly half the track, which is the original list, so
+       the duplicate lands where the original started. Duration scales with the
+       number of items to keep a constant speed as the list grows. */
+    animation: marquee calc(var(--count, 10) * 3.2s) linear infinite;
+  }
+  .marquee-viewport:hover .marquee-track,
+  .marquee-viewport:focus-within .marquee-track { animation-play-state: paused; }
+
+  .marquee-track li { display: flex; align-items: center; flex-shrink: 0; }
+  .marquee-track img { height: 48px; width: auto; opacity: 0.9; }
+  /* Dark artwork would vanish against this background, so it is recoloured to a
+     white silhouette. Applied per logo rather than to the row: the marks that
+     already read light lose their interior detail under the same treatment and
+     come out as solid white discs. */
+  .marquee-track img.is-dark { filter: brightness(0) invert(1); }
+  .client-chip {
+    display: inline-block;
+    white-space: nowrap;
+    font-weight: 700;
+    font-size: 1.02rem;
+    color: var(--ink-dim);
+    opacity: 0.85;
+  }
+
+  @keyframes marquee {
+    from { transform: translateX(0); }
+    /* RTL: the track starts flush right, so it travels right to left visually
+       by moving in the positive direction. */
+    to { transform: translateX(50%); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .marquee-track {
+      animation: none;
+      flex-wrap: wrap;
+      justify-content: center;
+      width: auto;
+      gap: 1.25rem 2rem;
+    }
+    /* Without motion the duplicate half would just repeat every name. */
+    .marquee-track li[aria-hidden='true'] { display: none; }
+  }
+</style>

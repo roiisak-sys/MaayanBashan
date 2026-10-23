@@ -100,7 +100,59 @@ collections:
             fields:
               - {label: "כותרת", name: "title", widget: "string"}
               - {label: "תיאור", name: "description", widget: "string"}
+          - label: "קטלוג ההרצאות"
+            name: "lectures"
+            widget: "list"
+            required: false
+            hint: "כל הרצאה מופיעה ככרטיס בעמוד וגם בנתוני ה-schema של גוגל"
+            fields:
+              - {label: "שם ההרצאה", name: "title", widget: "string"}
+              - {label: "אורך", name: "duration", widget: "string", required: false, hint: "למשל: 90 דקות"}
+              - {label: "תיאור", name: "summary", widget: "text"}
+              - {label: "מתאים ל", name: "forWhom", widget: "string", required: false}
+              - label: "מה לוקחים מההרצאה"
+                name: "takeaways"
+                widget: "list"
+                required: false
+                field: {label: "שורה", name: "item", widget: "string"}
+              - {label: "מרצה אורח", name: "guest", widget: "string", required: false}
+              - {label: "להבליט ככרטיס מומלץ", name: "featured", widget: "boolean", default: false, required: false}
+          - label: "איך זה עובד (שלבים)"
+            name: "process"
+            widget: "list"
+            required: false
+            fields:
+              - {label: "שם השלב", name: "title", widget: "string"}
+              - {label: "תיאור", name: "description", widget: "text"}
+          - label: "שאלות נפוצות"
+            name: "faq"
+            widget: "list"
+            required: false
+            hint: "מופיעות בעמוד וגם נשלחות לגוגל כ-FAQ"
+            fields:
+              - {label: "שאלה", name: "q", widget: "string"}
+              - {label: "תשובה", name: "a", widget: "text"}
+          - label: "ארגונים שעבדו עם מעיין (קרוסלה)"
+            name: "clients"
+            widget: "list"
+            required: false
+            hint: "רק ארגונים שההרצאה אצלם אכן התקיימה. בקשה להצעת מחיר אינה לקוח. בלי לוגו השם מוצג כטקסט"
+            fields:
+              - {label: "שם הארגון", name: "name", widget: "string"}
+              - {label: "לוגו", name: "logo", widget: "image", required: false}
+          - label: "משובים מארגונים"
+            name: "testimonials"
+            widget: "list"
+            required: false
+            hint: "ציטוט מדויק בלבד, כפי שנכתב. לא לנסח מחדש ולא להוסיף"
+            fields:
+              - {label: "הציטוט", name: "quote", widget: "text"}
+              - {label: "שם", name: "author", widget: "string"}
+              - {label: "תפקיד", name: "role", widget: "string", required: false}
+              - {label: "ארגון", name: "org", widget: "string", required: false}
+              - {label: "תאריך", name: "date", widget: "string", required: false}
           - {label: "פסקת סיכום", name: "closing", widget: "text"}
+          - {label: "טקסט מורחב (SEO)", name: "body", widget: "markdown", required: false, hint: "הטקסט הארוך בתחתית העמוד. כותרות בפורמט ## נקראות על ידי גוגל כשאלות"}
   - name: "testimonials"
     label: "המלצות"
     folder: "src/content/testimonials"
