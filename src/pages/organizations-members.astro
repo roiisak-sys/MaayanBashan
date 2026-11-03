@@ -1,7 +1,7 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
 import { getEntry } from 'astro:content';
-import { sortSessions, shortDate, shortDateWithYear, isoDate, cycleLabel } from '../lib/cycle';
+import { sortSessions, shortDate, shortDateWithYear, isoDate, cycleLabel, heWeekday } from '../lib/cycle';
 
 const page = await getEntry('members', 'members');
 const course = await getEntry('courses', 'open-body-analysis-course');
@@ -138,20 +138,22 @@ const whatsappHref = settings?.data.whatsapp
   ) : null}
 
   <section class="mem-when reveal">
-    <div class="mem-inner">
+    <div class="mem-inner mem-when-inner">
       <h2>מתי ואיפה</h2>
-      <div class="mem-facts">
-        <div><span>מתכונת</span><strong>5 מפגשים · 25 שעות</strong></div>
-        <div><span>ימים</span><strong>שישי, 9:00–14:00</strong></div>
-        <div><span>מיקום</span><strong>הרצליה</strong></div>
-        {label && <div><span>מחזור</span><strong>{label}</strong></div>}
-      </div>
-      {dates.length > 0 && (
-        <p class="mem-dates">
-          {dates.map((x, i) => (
-            <><span class="mem-date">{x}</span>{i < dates.length - 1 && <span class="mem-sep" aria-hidden="true">·</span>}</>
+      <p class="mem-where">
+        <strong>הרצליה</strong>
+        <span>{[`5 מפגשים · 25 שעות`, firstSession ? `ימי ${heWeekday(firstSession)}, 9:00–14:00` : null, label].filter(Boolean).join(' · ')}</span>
+      </p>
+      {sessions.length > 0 && (
+        <ol class="mem-tickets">
+          {sessions.map((session, i) => (
+            <li class="mem-ticket">
+              <span class="mem-ticket-day">{heWeekday(session)}</span>
+              <span class="mem-ticket-date">{shortDate(session)}</span>
+              <span class="mem-ticket-num">מפגש {i + 1}</span>
+            </li>
           ))}
-        </p>
+        </ol>
       )}
     </div>
   </section>
@@ -310,16 +312,36 @@ const whatsappHref = settings?.data.whatsapp
   .mem-bullets { margin: 0; padding-inline-start: 1.2rem; }
   .mem-bullets li { line-height: 1.75; color: var(--ink-dim); margin-bottom: 0.6rem; }
 
-  .mem-facts { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.25rem; }
-  .mem-facts div { display: flex; flex-direction: column; gap: 0.2rem; }
-  .mem-facts span { font-size: 0.82rem; color: var(--ink-dim); opacity: 0.75; }
-  .mem-facts strong { color: var(--ink); font-size: 0.98rem; }
-  .mem-dates { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin: 0; }
-  .mem-date {
-    background: var(--card); border-radius: 8px;
-    padding: 0.3rem 0.65rem; font-weight: 700; font-size: 0.92rem; color: var(--gold);
+
+  /* The schedule is the section people screenshot and forward, so it runs the
+     full width rather than inside the narrow reading column. */
+  .mem-when-inner { max-width: 980px; }
+  .mem-where {
+    display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.3rem 0.75rem;
+    margin: 0 0 1.5rem;
   }
-  .mem-sep { opacity: 0.3; }
+  .mem-where strong {
+    color: var(--gold); font-size: clamp(1.35rem, 3vw, 1.75rem); font-weight: 800;
+  }
+  .mem-where span { color: var(--ink-dim); font-size: 0.98rem; }
+
+  .mem-tickets {
+    list-style: none; margin: 0; padding: 0;
+    display: grid; grid-template-columns: repeat(5, 1fr); gap: 0.85rem;
+  }
+  .mem-ticket {
+    display: flex; flex-direction: column; align-items: center; gap: 0.15rem;
+    background: var(--card);
+    border: 1.5px solid var(--border);
+    border-radius: 14px;
+    padding: 1.15rem 0.5rem;
+  }
+  .mem-ticket-day { font-size: 0.82rem; color: var(--ink-dim); }
+  .mem-ticket-date {
+    font-size: clamp(1.4rem, 3.2vw, 1.9rem); font-weight: 800; color: var(--gold);
+    line-height: 1.15;
+  }
+  .mem-ticket-num { font-size: 0.78rem; color: var(--ink-dim); opacity: 0.75; }
 
   .mem-faq-item {
     background: var(--card); border-radius: 10px;
@@ -368,13 +390,17 @@ const whatsappHref = settings?.data.whatsapp
     .mem-hero-grid { flex-direction: column-reverse; align-items: stretch; gap: 1.75rem; }
     .mem-hero-image { flex: 0 0 auto; width: 190px; margin: 0 auto; }
   }
+  @media (max-width: 760px) {
+    .mem-tickets { grid-template-columns: repeat(3, 1fr); }
+  }
   @media (max-width: 620px) {
     .mem-audience { grid-template-columns: 1fr; }
     .mem-trust { gap: 0.9rem 2rem; }
     .mem-trust span { font-size: 1.45rem; }
   }
   @media (max-width: 560px) {
-    .mem-row, .mem-facts { grid-template-columns: 1fr; }
+    .mem-row { grid-template-columns: 1fr; }
+    .mem-tickets { grid-template-columns: repeat(2, 1fr); gap: 0.6rem; }
     .mem-form-wrap { padding: 1.75rem 1.35rem; }
   }
 </style>

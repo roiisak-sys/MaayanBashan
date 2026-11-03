@@ -15,6 +15,11 @@ const HE_MONTHS = [
 export const sortSessions = (sessions: Date[] = []): Date[] =>
   [...sessions].sort((a, b) => a.valueOf() - b.valueOf());
 
+const HE_WEEKDAYS = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'];
+
+/** "שישי" — derived rather than assumed, so a weekday cohort prints correctly. */
+export const heWeekday = (d: Date): string => HE_WEEKDAYS[d.getUTCDay()];
+
 /** "18.12" — the form used on the schedule tickets. */
 export const shortDate = (d: Date): string => `${d.getUTCDate()}.${d.getUTCMonth() + 1}`;
 
