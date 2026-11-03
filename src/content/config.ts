@@ -159,6 +159,41 @@ const partnerLogos = defineCollection({
   }),
 });
 
+
+// The members landing page: a short, generic offer aimed at employees of
+// organizations where Maayan has already lectured. Everything commercial on it
+// is editable, so the coupon and the price can be set without a deploy.
+const members = defineCollection({
+  loader: glob({ pattern: 'members.md', base: './src/content/members' }),
+  schema: z.object({
+    // The course this offer is for, set above the headline so a reader who
+    // arrives from a lecture knows immediately which course is on offer.
+    courseName: z.string().optional(),
+    title: z.string(),
+    intro: z.string(),
+    heroImage: z.string().optional(),
+    heroImageAlt: z.string().optional(),
+    // Shown only once set. Until then the page makes no price claim at all,
+    // rather than promising a discount the payment page would not honour.
+    regularPrice: z.number().optional(),
+    memberPrice: z.number().optional(),
+    couponCode: z.string().optional(),
+    couponNote: z.string().optional(),
+    bullets: z.array(z.string()).default([]),
+    // The credibility strip carried over from the course page.
+    stats: z.array(z.object({ value: z.string(), label: z.string() })).default([]),
+    // Who the course is built for. Same roles as the course page, so a reader
+    // who saw one and then the other is not told two different things.
+    audience: z.array(z.object({ title: z.string(), description: z.string() })).default([]),
+    // A YouTube id, not a full URL: the embed is built around it, and a pasted
+    // watch link would break the player.
+    videoId: z.string().optional(),
+    videoTitle: z.string().optional(),
+    faq: z.array(z.object({ q: z.string(), a: z.string() })).default([]),
+    closing: z.string().optional(),
+  }),
+});
+
 export const collections = {
   settings,
   about,
@@ -168,4 +203,5 @@ export const collections = {
   guides,
   testimonials,
   partner_logos: partnerLogos,
+  members,
 };
