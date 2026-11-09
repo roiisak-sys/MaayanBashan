@@ -20,13 +20,13 @@ const d = page?.data;
 const showPrice = typeof d?.memberPrice === 'number' && typeof d?.regularPrice === 'number';
 const saving = showPrice ? d!.regularPrice! - d!.memberPrice! : 0;
 
-const whatsappMessage = `היי מעיין, השתתפתי בהרצאה שלך בארגון ואשמח לפרטים על הקורס${d?.couponCode ? ` (קוד ${d.couponCode})` : ''}`;
+const whatsappMessage = `היי מעיין, השתתפתי בהרצאה שלך בארגון ואשמח לפרטים על הקורס${d?.couponCode ? ` (קופון ${d.couponCode})` : ''}`;
 const whatsappHref = settings?.data.whatsapp
   ? `${settings.data.whatsapp}?text=${encodeURIComponent(whatsappMessage)}`
   : undefined;
 ---
 <BaseLayout
-  title="קורס שפת גוף מלא במחיר לחברי הארגון"
+  title="קורס שפת גוף בהנחה לחברי הארגון"
   description="השתתפתם בהרצאה של מעיין בשן בארגון? קורס שפת הגוף המלא, ניתוח גוף פתוח, 25 שעות, במחיר מיוחד לחברי הארגון."
   keywords="קורס שפת גוף לעובדים, קורס שפת גוף מחיר מיוחד, ניתוח גוף פתוח, מעיין בשן קורס, הטבה לעובדים"
   bgVariant="deep"
@@ -38,7 +38,6 @@ const whatsappHref = settings?.data.whatsapp
   <section class="mem-hero reveal">
     <div class="mem-inner mem-hero-grid">
       <div class="mem-hero-text">
-      <span class="eyebrow">הטבה לחברי הארגון</span>
       <h1>
         {d?.courseName && <span class="mem-h1-lead">{d.courseName}</span>}
         {d?.title}
@@ -47,7 +46,7 @@ const whatsappHref = settings?.data.whatsapp
 
       {d?.couponCode && (
         <div class="mem-coupon">
-          <span class="mem-coupon-label">קוד ההטבה</span>
+          <span class="mem-coupon-label">קופון ההטבה</span>
           <strong class="mem-coupon-code">{d.couponCode}</strong>
           {d.couponNote && <span class="mem-coupon-note">{d.couponNote}</span>}
         </div>
@@ -62,7 +61,7 @@ const whatsappHref = settings?.data.whatsapp
       )}
 
       <div class="mem-cta-row">
-        <a class="btn btn-orange" href="#register">להרשמה עם הקוד ←</a>
+        <a class="btn btn-orange" href="#register">להרשמה עם הקופון ←</a>
         {whatsappHref && (
           <a class="mem-ghost" href={whatsappHref} target="_blank" rel="noopener">שאלה בוואטסאפ</a>
         )}
@@ -184,13 +183,13 @@ const whatsappHref = settings?.data.whatsapp
         <label>מייל<input type="email" name="email" autocomplete="email" /></label>
         <label>הארגון שבו שמעת את ההרצאה<input type="text" name="organization" autocomplete="organization" /></label>
         {d?.couponCode && (
-          <label>קוד הטבה<input type="text" name="coupon" value={d.couponCode} readonly /></label>
+          <label>קופון ההטבה<input type="text" name="coupon" value={d.couponCode} readonly /></label>
         )}
         <button type="submit" class="btn btn-orange">להמשך להרשמה ←</button>
       </form>
       <p class="mem-sending" hidden>רק רגע, שומרים את הפרטים...</p>
       <p class="mem-error" hidden>אירעה תקלה בשליחה. נסו שוב, או דברו איתנו בוואטסאפ.</p>
-      <p class="mem-note">אחרי השליחה תועברו לעמוד תשלום מאובטח.</p>
+      <p class="mem-note">אחרי השליחה תועברו לעמוד תשלום מאובטח, עם ההנחה כבר מוחלת.</p>
     </div>
   </section>
 
@@ -224,11 +223,11 @@ const whatsappHref = settings?.data.whatsapp
      knows which course this is before reading anything else. */
   .mem-h1-lead {
     display: block;
-    font-size: 0.92rem;
+    font-size: clamp(1.05rem, 2.2vw, 1.3rem);
     font-weight: 700;
-    letter-spacing: 0.04em;
-    color: var(--ink-dim);
-    margin-bottom: 0.5rem;
+    line-height: 1.4;
+    color: var(--ink);
+    margin-bottom: 0.6rem;
   }
 
   /* Explicit width: without it the flex item is sized from the portrait's

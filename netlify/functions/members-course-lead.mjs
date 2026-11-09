@@ -6,20 +6,12 @@
 // returns the branded pay page. What differs is the source label, so this
 // channel is countable in the CRM, and the discount.
 //
-// The discount can be configured two ways, and the function prefers the first:
-//
-//   MEMBERS_CYCLE_ID    an Airtable cycle carrying the member price. The engine
-//                       resolves the price from it, so the CRM records what the
-//                       buyer actually pays. This is the accurate route.
-//   MEMBERS_PAYMENT_URL a dedicated Cardcom page at the member price. The lead
-//                       is still created with full attribution, but the CRM
-//                       keeps the regular cycle's price, so the row will read
-//                       higher than the amount charged.
-//
-// With neither set the page falls through to the ordinary cycle at the regular
-// price. That is deliberate: a landing page that promises a discount and then
-// charges full price is worse than one that quietly charges the normal price
-// while the offer is still being set up.
+// The discount is a coupon on the engine's own pay page, not a separate cycle
+// or a separate Cardcom link: same cohort, same page, one price list. The page
+// accepts ?coupon= and renders with the discount already applied, so the buyer
+// lands on the member price without having to remember to type anything. The
+// engine validates the code against the product, so a code that does not apply
+// simply does not discount.
 
 import { unifiedFallbackLead } from './lib/unified-lead.mjs';
 
@@ -30,8 +22,6 @@ const FALLBACK_PAYMENT_URL = 'https://secure.cardcom.solutions/EA/EA5/4SwsNP9VJ0
 const COURSE_PRODUCT_ID = process.env.COURSE_PRODUCT_ID || 'recM5qlPShBRueS1t';
 const LAST_KNOWN_COURSE_RECORD_ID = 'recjezzByzUmQ5VYo';
 
-const MEMBERS_CYCLE_ID = process.env.MEMBERS_CYCLE_ID || '';
-const MEMBERS_PAYMENT_URL = process.env.MEMBERS_PAYMENT_URL || '';
 
 async function activeCycleId() {
   try {
@@ -90,6 +80,20 @@ async function engineLead({ name, phone, email, cycleId, note, utm }) {
   }
 }
 
+/** Carry the coupon onto the pay page, which applies it on load. Appended
+ *  rather than replaced, because the engine's URL already carries its own
+ *  query string and dropping it would lose the lead's attribution. */
+function withCoupon(url, coupon) {
+  if (!coupon) return url;
+  try {
+    const u = new URL(url);
+    u.searchParams.set('coupon', coupon);
+    return u.toString();
+  } catch {
+    return url;
+  }
+}
+
 export default async (request) => {
   if (request.method !== 'POST') {
     return new Response('Method Not Allowed', { status: 405 });
@@ -123,15 +127,11 @@ export default async (request) => {
   const coupon = read('coupon').slice(0, 40);
   const note = [coupon, organization].filter(Boolean).join(' · ');
 
-  // The member cycle wins when configured; otherwise the ordinary open cycle.
-  const cycleId = MEMBERS_CYCLE_ID || (await activeCycleId());
+  const cycleId = await activeCycleId();
 
   const payUrl = cycleId ? await engineLead({ name, phone, email, cycleId, note, utm }) : null;
   if (payUrl) {
-    // A dedicated Cardcom page overrides the engine's pay page, but only when
-    // no member cycle is configured: that route already prices correctly.
-    const finalUrl = !MEMBERS_CYCLE_ID && MEMBERS_PAYMENT_URL ? MEMBERS_PAYMENT_URL : payUrl;
-    return Response.json({ ok: true, payUrl: finalUrl });
+    return Response.json({ ok: true, payUrl: withCoupon(payUrl, coupon) });
   }
 
   const courseRecordId = cycleId || LAST_KNOWN_COURSE_RECORD_ID;
@@ -141,11 +141,9 @@ export default async (request) => {
     utm,
   });
   if (!saved) return Response.json({ ok: false, error: 'lead not saved' }, { status: 502 });
-  return Response.json({
-    ok: true,
-    payUrl: MEMBERS_PAYMENT_URL || FALLBACK_PAYMENT_URL,
-    degraded: true,
-  });
+  // The Cardcom fallback has no coupon field, so a degraded checkout is at the
+  // list price. Flagged so the caller can say so rather than quietly overcharge.
+  return Response.json({ ok: true, payUrl: FALLBACK_PAYMENT_URL, degraded: true });
 };
 
 export const config = { path: '/api/members-course-lead' };

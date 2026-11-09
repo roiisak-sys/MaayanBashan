@@ -96,8 +96,8 @@ collections:
           - {label: "פתיח", name: "intro", widget: "text"}
           - {label: "תמונת hero", name: "heroImage", widget: "image", required: false}
           - {label: "טקסט חלופי לתמונה", name: "heroImageAlt", widget: "string", required: false}
-          - {label: "קוד ההטבה", name: "couponCode", widget: "string", required: false, hint: "מוצג בגדול בראש הדף. בלי קוד, הקופסה לא מוצגת"}
-          - {label: "הערה מתחת לקוד", name: "couponNote", widget: "string", required: false, hint: "למשל: בתוקף עד 10.12"}
+          - {label: "קופון ההטבה", name: "couponCode", widget: "string", required: false, hint: "מוצג בגדול בראש הדף. בלי קופון, הקופסה לא מוצגת"}
+          - {label: "הערה מתחת לקופון", name: "couponNote", widget: "string", required: false, hint: "למשל: בתוקף עד 10.12"}
           - {label: "מחיר מלא", name: "regularPrice", widget: "number", required: false, value_type: "int"}
           - {label: "מחיר לחברי ארגון", name: "memberPrice", widget: "number", required: false, value_type: "int", hint: "המחיר מוצג רק כששני השדות מלאים, וחייב להתאים למחיר בעמוד התשלום"}
           - label: "מה יש בקורס"
