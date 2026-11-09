@@ -1,0 +1,13 @@
+---
+import { getEntry } from 'astro:content';
+import MemberOffer from '../components/MemberOffer.astro';
+
+const entry = await getEntry('members', 'coaches');
+---
+<MemberOffer
+  entry={entry!}
+  title="קורס שפת גוף בהנחה לקהילת המאמנים"
+  description="הייתם בהרצאה של מעיין בשן בקהילת המאמנים? קורס שפת הגוף המלא, ניתוח גוף פתוח, 25 שעות, במחיר מיוחד לחברי הקהילה."
+  keywords="קורס שפת גוף למאמנים, שפת גוף באימון, ניתוח גוף פתוח, מעיין בשן קורס, קורס שפת גוף מחיר מיוחד"
+  attendedWhat="בהרצאה שלך בקהילת המאמנים"
+/>

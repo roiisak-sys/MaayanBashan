@@ -160,11 +160,11 @@ const partnerLogos = defineCollection({
 });
 
 
-// The members landing page: a short, generic offer aimed at employees of
-// organizations where Maayan has already lectured. Everything commercial on it
-// is editable, so the coupon and the price can be set without a deploy.
+// The members landing pages: one short offer per audience Maayan has lectured
+// to, each reached by a link rather than by search. Everything commercial is
+// editable, so a coupon or a price can change without a deploy.
 const members = defineCollection({
-  loader: glob({ pattern: 'members.md', base: './src/content/members' }),
+  loader: glob({ pattern: '**/*.md', base: './src/content/members' }),
   schema: z.object({
     // The course this offer is for, set above the headline so a reader who
     // arrives from a lecture knows immediately which course is on offer.
