@@ -1,0 +1,248 @@
+---
+// Short ad landing page for the body language course: one screen on a phone,
+// one job. The visitor leaves a name and a phone, and a sales rep calls back.
+// No price, no payment, no navigation away from the form.
+//
+// The lead goes to /api/course-call-lead (the admin engine, Maayan's division)
+// with the ad attribution, and to Netlify Forms as a backup copy.
+//
+// Reached from ads only: noindex here, and excluded from the sitemap in
+// astro.config.mjs.
+import { getEntry } from 'astro:content';
+import MetaPixel from '../components/MetaPixel.astro';
+import Attribution from '../components/Attribution.astro';
+import { sortSessions, shortDate, heWeekday } from '../lib/cycle';
+import '../styles/global.css';
+
+// The cohort's dates live in the CMS, same source as the full course page.
+const course = await getEntry('courses', 'open-body-analysis-course');
+const sessions = sortSessions(course?.data.sessions ?? []);
+const firstSession = sessions[0];
+const startsOn = firstSession ? `ביום ${heWeekday(firstSession)}, ${shortDate(firstSession)}` : '';
+---
+<!doctype html>
+<html lang="he" dir="rtl">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>קורס שפת גוף "ניתוח גוף פתוח" | מעיין בשן</title>
+    <meta name="description" content="קורס שפת הגוף של מעיין בשן, ניתוח גוף פתוח. משאירים פרטים וחוזרים אליכם בטלפון." />
+    <meta name="robots" content="noindex, nofollow" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;600;700;800&display=swap" rel="stylesheet" />
+    <MetaPixel />
+  </head>
+  <body>
+    <Attribution />
+    <main class="cl-page">
+      <div class="cl-text">
+        <img class="cl-logo" src="/images/logo-white.png" alt="מעיין בשן" width="140" height="26" />
+        {startsOn && <div class="cl-pill">מתחילים {startsOn} · הרצליה</div>}
+        <h1><span class="cl-h1-lead">קורס שפת גוף ״ניתוח גוף פתוח״</span>לקרוא אנשים כמו <em>ספר פתוח</em></h1>
+        <p class="cl-sub">הקורס של מעיין בשן: חמישה ימי שישי בבוקר, בהרצליה. 25 שעות של תרגול אמיתי.</p>
+        <p class="cl-list-title">בקורס נלמד איך:</p>
+        <ul class="cl-bullets">
+          <li>לזהות שקרים ומניפולציות לפני שהצד השני מסיים משפט</li>
+          <li>לקרוא כוונות ורגש בפגישות, במשא ומתן ובראיונות</li>
+          <li>לשדר ביטחון ונוכחות, גם תחת לחץ</li>
+        </ul>
+      </div>
+
+      <div class="cl-form-wrap">
+        <form name="course-call" method="POST" data-netlify="true" netlify-honeypot="bot-field">
+          <input type="hidden" name="form-name" value="course-call" />
+          <p class="cl-hidden-field"><label>אל תמלאו שדה זה: <input name="bot-field" tabindex="-1" autocomplete="off" /></label></p>
+          <h2>השאירו פרטים ונחזור אליכם בטלפון</h2>
+          <label>שם מלא<input type="text" name="name" autocomplete="name" required /></label>
+          <label>טלפון<input type="tel" name="phone" autocomplete="tel" inputmode="tel" dir="ltr" required pattern="[0-9+\-\s]{9,15}" title="מספר טלפון, ספרות בלבד" /></label>
+          <label class="cl-consent">
+            <input type="checkbox" name="consent" value="yes" required />
+            <span>אישור לצוות של מעיין בשן לחזור אליי בטלפון ובוואטסאפ עם פרטים על הקורס</span>
+          </label>
+          <button type="submit">חזרו אליי עם כל הפרטים</button>
+          <p class="cl-form-error" role="alert" hidden>השליחה לא הצליחה. בדקו את החיבור ונסו שוב.</p>
+        </form>
+        <div class="cl-form-success" role="status" hidden>
+          <h2>הפרטים התקבלו, תודה</h2>
+          <p>נציג או נציגה מהצוות של מעיין יחזרו אליכם בטלפון עם כל הפרטים על הקורס.</p>
+        </div>
+      </div>
+    </main>
+
+    <script is:inline>
+      (function () {
+        var form = document.querySelector('form[name="course-call"]');
+        if (!form) return;
+        var button = form.querySelector('button[type="submit"]');
+        var success = document.querySelector('.cl-form-success');
+        var error = form.querySelector('.cl-form-error');
+        var busy = false;
+        form.addEventListener('submit', function (event) {
+          event.preventDefault();
+          if (busy) return; // double tap
+          busy = true;
+          var original = button.textContent;
+          button.disabled = true;
+          button.textContent = 'שולחים...';
+          error.setAttribute('hidden', '');
+          var data = new FormData(form);
+          // This visit's ad tags, or the last tagged visit, or the referrer.
+          var utm = window.mbAttribution ? window.mbAttribution() : {};
+
+          // Backup copy in Netlify Forms, with the attribution alongside.
+          var pairs = [];
+          data.forEach(function (value, key) { pairs.push(encodeURIComponent(key) + '=' + encodeURIComponent(String(value))); });
+          var backup = fetch('/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: pairs.join('&'),
+          }).then(function (r) { return r.ok; }).catch(function () { return false; });
+
+          var payload = { name: data.get('name'), phone: data.get('phone'), company: data.get('bot-field') };
+          Object.keys(utm).forEach(function (k) { payload[k] = utm[k]; });
+          var crm = fetch('/api/course-call-lead', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          }).then(function (r) { return r.ok; }).catch(function () { return false; });
+
+          Promise.all([backup, crm]).then(function (results) {
+            if (results[0] || results[1]) {
+              if (window.fbq) window.fbq('track', 'Lead', { content_name: 'course-call' });
+              form.hidden = true;
+              success.removeAttribute('hidden');
+              success.scrollIntoView({ block: 'center' });
+            } else {
+              error.removeAttribute('hidden');
+              busy = false;
+              button.disabled = false;
+              button.textContent = original;
+            }
+          });
+        });
+      })();
+    </script>
+  </body>
+</html>
+
+<style>
+  /* Navy and gold, the same tokens as the full course page. */
+  :root {
+    --cl-bg: #0b1024;
+    --cl-card: #17204a;
+    --cl-navy-deep: #0a0e1c;
+    --cl-ink: #f3efe3;
+    --cl-ink-dim: rgba(243, 239, 227, 0.78);
+    --cl-gold: #c9a05c;
+    --cl-gold-soft: #e6cd94;
+    --cl-rose: #e8a1b1;
+    --cl-border: rgba(201, 160, 92, 0.28);
+    --cl-font: 'Assistant', system-ui, sans-serif;
+  }
+  body {
+    font-family: var(--cl-font); color: var(--cl-ink);
+    background:
+      radial-gradient(ellipse 700px 420px at 90% 0%, rgba(201, 160, 92, 0.2), transparent 65%),
+      var(--cl-bg);
+    min-height: 100vh; min-height: 100dvh;
+  }
+  h1, h2 { font-family: var(--cl-font); margin: 0; }
+  [hidden] { display: none !important; }
+
+  .cl-page {
+    max-width: 30rem; margin: 0 auto;
+    padding: 0.9rem 1.1rem 1.25rem;
+    display: flex; flex-direction: column; gap: 0.9rem;
+  }
+  .cl-logo { height: 22px; width: auto; margin-bottom: 0.75rem; }
+  .cl-pill {
+    display: inline-block; margin-bottom: 0.55rem;
+    padding: 0.2rem 0.75rem; border-radius: 999px;
+    border: 1px solid var(--cl-border); background: rgba(201, 160, 92, 0.12);
+    color: var(--cl-gold-soft); font-weight: 700; font-size: 0.85rem;
+  }
+  h1 { font-size: 1.85rem; font-weight: 800; line-height: 1.12; letter-spacing: -0.01em; }
+  h1 em { font-style: normal; color: var(--cl-gold-soft); }
+  .cl-h1-lead {
+    display: block; margin-bottom: 0.25rem;
+    font-size: 0.9rem; font-weight: 700; letter-spacing: 0; color: var(--cl-ink-dim);
+  }
+  .cl-sub { margin: 0.5rem 0 0; font-size: 1rem; line-height: 1.4; color: var(--cl-ink-dim); }
+  .cl-list-title { margin: 0.6rem 0 0.25rem; font-weight: 800; font-size: 1rem; }
+  .cl-bullets { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.2rem; }
+  .cl-bullets li {
+    position: relative; padding-inline-start: 1.15rem;
+    font-size: 0.97rem; line-height: 1.35;
+  }
+  .cl-bullets li::before {
+    content: ''; position: absolute; inset-inline-start: 0; top: 0.5em;
+    width: 0.45rem; height: 0.45rem; border-radius: 50%; background: var(--cl-gold);
+  }
+
+  .cl-form-wrap {
+    background: var(--cl-card); border: 1px solid var(--cl-border);
+    border-radius: 16px; padding: 1rem 1rem 1.1rem;
+    box-shadow: 0 14px 36px rgba(0, 0, 0, 0.35);
+  }
+  .cl-form-wrap h2 { font-size: 1.1rem; font-weight: 800; line-height: 1.25; }
+  .cl-form-wrap form { display: flex; flex-direction: column; gap: 0.6rem; }
+  .cl-form-wrap label {
+    display: flex; flex-direction: column; gap: 0.2rem;
+    font-weight: 700; font-size: 0.9rem;
+  }
+  .cl-form-wrap input[type='text'], .cl-form-wrap input[type='tel'] {
+    padding: 0.6rem 0.75rem; border-radius: 10px;
+    border: 1.5px solid rgba(243, 239, 227, 0.25);
+    /* 16px keeps iOS Safari from zooming the page on focus. */
+    font-family: inherit; font-size: 16px;
+    color: var(--cl-ink); background: rgba(255, 255, 255, 0.06);
+  }
+  .cl-form-wrap input[type='tel'] { text-align: right; }
+  .cl-form-wrap input:focus-visible { outline: 2px solid var(--cl-gold); outline-offset: 1px; }
+  .cl-form-wrap label.cl-consent {
+    flex-direction: row; align-items: flex-start; gap: 0.5rem;
+    font-weight: 500; font-size: 0.85rem; line-height: 1.35; color: var(--cl-ink-dim);
+    cursor: pointer;
+  }
+  .cl-consent input {
+    flex-shrink: 0; width: 1.15rem; height: 1.15rem; margin: 0.1rem 0 0;
+    accent-color: var(--cl-gold);
+  }
+  .cl-form-wrap button {
+    font-family: inherit; padding: 0.85rem 1rem; margin-top: 0.15rem;
+    background: linear-gradient(135deg, var(--cl-gold-soft), var(--cl-gold) 62%, #8a6423);
+    color: var(--cl-navy-deep); border: none; border-radius: 999px;
+    font-weight: 800; font-size: 1.08rem; cursor: pointer;
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.3);
+    transition: transform 0.15s ease;
+  }
+  .cl-form-wrap button:hover:not(:disabled) { transform: translateY(-2px); }
+  .cl-form-wrap button:focus-visible { outline: 3px solid var(--cl-gold-soft); outline-offset: 3px; }
+  .cl-form-wrap button:disabled { opacity: 0.75; cursor: default; }
+  .cl-hidden-field { display: none; }
+  .cl-form-error { margin: 0; text-align: center; font-weight: 700; font-size: 0.92rem; color: var(--cl-rose); }
+  .cl-form-success { text-align: center; padding: 1.25rem 0.25rem; }
+  .cl-form-success h2 { color: var(--cl-gold-soft); font-size: 1.35rem; }
+  .cl-form-success p { margin: 0.6rem 0 0; line-height: 1.45; }
+
+  /* Wide screens: text beside the form. */
+  @media (min-width: 860px) {
+    .cl-page {
+      max-width: 62rem; min-height: 100vh; padding: 2.5rem 2rem;
+      flex-direction: row; align-items: center; gap: 3.5rem;
+    }
+    .cl-text { flex: 1.15; }
+    .cl-form-wrap { flex: 1; padding: 1.75rem 1.6rem 1.9rem; }
+    .cl-logo { height: 28px; margin-bottom: 1.5rem; }
+    h1 { font-size: 3rem; }
+    .cl-h1-lead { font-size: 1.05rem; }
+    .cl-sub { font-size: 1.15rem; }
+    .cl-list-title, .cl-bullets li { font-size: 1.08rem; }
+    .cl-form-wrap h2 { font-size: 1.35rem; }
+    .cl-form-wrap form { gap: 0.85rem; }
+  }
+</style>
