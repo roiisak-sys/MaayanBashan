@@ -8,7 +8,8 @@ export default defineConfig({
       // Pages that carry a noindex must not be advertised in the sitemap
       // either: /certificate is a private utility for course graduates, and
       // the member offers are private, reached by a link rather than by search.
-      filter: (page) => !['/certificate', '/organizations-members', '/coaches'].some((p) => page.includes(p)),
+      // /body-language-course-call is an ad landing page, reached from ads only.
+      filter: (page) => !['/certificate', '/organizations-members', '/coaches', '/body-language-course-call'].some((p) => page.includes(p)),
     }),
   ],
 });
