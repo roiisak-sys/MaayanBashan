@@ -92,7 +92,7 @@ const faqs = [
     <meta property="og:title" content="קורס שפת גוף למתקדמים | מעיין בשן" />
     <meta property="og:description" content='קורס המשך בלעדי לבוגרי "ניתוח גוף פתוח" - 6 מפגשים, ינואר-פברואר 2027, הרצליה' />
     <meta property="og:url" content="https://maayanbashan.co.il/body-language-advanced-course/" />
-    <meta property="og:image" content="https://maayanbashan.co.il/images/maayan-hero.png" />
+    <meta property="og:image" content="https://maayanbashan.co.il/images/maayan-hero.jpg" />
     <meta property="og:locale" content="he_IL" />
     <meta property="og:site_name" content="מעיין בשן" />
     <meta name="twitter:card" content="summary_large_image" />
@@ -782,7 +782,11 @@ const faqs = [
     z-index: 0;
   }
   .ac-practice-photo img {
-    max-width: min(280px, 100%);
+    width: min(280px, 100%);
+    height: auto;
+    aspect-ratio: 1;
+    object-fit: cover;
+    object-position: center top;
     position: relative;
     z-index: 1;
     border-radius: 50%;
